@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BookStore</title>
+    <style>
+        :root{--ink:#22283b;--muted:#82889a;--purple:#6855c7;--navy:#292e60;--bg:#f6f7fb;--line:#e8eaf1;--white:#fff}
+        *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Arial,sans-serif}
+        button,input,select,textarea{font:inherit}button,a{cursor:pointer}a{text-decoration:none;color:inherit}
+        .top{height:72px;background:white;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:24px;padding:0 max(4%,calc((100% - 1240px)/2));position:sticky;top:0;z-index:4}
+        .logo{white-space:nowrap;color:var(--navy);font-size:21px;font-weight:800}.logo span{font-size:24px}
+        .search{height:42px;display:flex;flex:1;max-width:480px;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fafbfc}
+        .search input{width:100%;padding:0 13px;border:0;outline:none;background:transparent}.search button{border:0;padding:0 17px;background:var(--purple);color:#fff}
+        .nav{margin-left:auto;display:flex;align-items:center;gap:8px}.nav a,.nav button{border:0;background:transparent;padding:10px;color:#555b69;font-weight:700}
+        .nav .cartlink{background:var(--purple);color:white;border-radius:8px}
+        .subnav{height:43px;padding:0 5%;display:flex;align-items:center;gap:25px;background:white;border-bottom:1px solid var(--line);font-size:13px;color:#666c7a}
+        .subnav a:hover{color:var(--purple)}
+        .container{width:min(1240px,92%);margin:28px auto 60px}
+        .hero{min-height:260px;border-radius:18px;padding:38px 46px;color:#fff;background:radial-gradient(circle at 83% 40%,#ffffff26 0 100px,transparent 101px),linear-gradient(115deg,#292e60,#7865d3);display:flex;align-items:center;justify-content:space-between;margin-bottom:27px}
+        .hero small{letter-spacing:2px;font-weight:800;color:#e7e3ff}.hero h1{font-size:clamp(36px,5vw,56px);margin:12px 0;line-height:1.04}.hero p{max-width:520px;color:#eeedff;line-height:1.6}.hero-icon{font-size:95px;padding-right:7%}
+        .view{display:none}.view.active{display:block}
+        .layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:20px}
+        .panel{background:white;border:1px solid var(--line);border-radius:11px;padding:19px}
+        .filters h3{margin:0 0 13px;font-size:16px}.filtergroup{padding:14px 0;border-bottom:1px solid var(--line)}.filtergroup:last-child{border:0}
+        .filtergroup label{display:block;margin:9px 0;color:#676e7d;font-size:13px}.filtergroup input[type=checkbox]{accent-color:var(--purple);margin-right:7px}
+        .prices{display:flex;gap:7px;margin-top:10px}.prices input{width:50%;min-width:0;height:35px;padding:0 8px;border:1px solid var(--line);border-radius:6px}
+        .btn{border:0;border-radius:8px;padding:11px 15px;background:var(--purple);color:white;font-weight:700}
+        .btn.secondary{background:#eff0f8;color:var(--navy)}.btn.danger{background:#ffe8eb;color:#ae3e4b}
+        .btn.small{padding:8px 10px;font-size:12px}.wide{width:100%;margin-top:9px}
+        .headrow{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:17px}.headrow h2{margin:0;font-size:22px}.muted{color:var(--muted);font-size:13px}
+        .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+        .book{overflow:hidden;background:#fff;border:1px solid var(--line);border-radius:10px;transition:.18s}.book:hover{transform:translateY(-3px);box-shadow:0 12px 25px #20264b12}
+        .cover{height:195px;display:grid;place-items:center;padding:15px;background:#edf0f8}.cover img{max-width:100%;max-height:100%;object-fit:contain;box-shadow:0 8px 15px #0002}
+        .fallback{width:120px;height:160px;padding:12px;display:grid;place-items:center;text-align:center;color:#fff;font:bold 16px Georgia;background:linear-gradient(145deg,#30386c,#806bd0);box-shadow:0 8px 18px #0003}
+        .bookbody{padding:13px}.category{font-size:10px;color:var(--purple);font-weight:800;letter-spacing:1px;text-transform:uppercase}
+        .book h3{font-size:15px;margin:7px 0 4px}.author{font-size:12px;color:var(--muted)}.desc{height:34px;overflow:hidden;color:#737a88;font-size:12px;line-height:1.5;margin:9px 0}
+        .price{color:var(--navy);font-weight:800;margin:10px 0}.actions{display:flex;gap:7px}.actions>*{flex:1;text-align:center}
+        .notice{display:none;padding:12px;margin:12px 0;border-radius:8px;background:#fff0e7;color:#93482f}.notice.ok{background:#e7f5ed;color:#26714f}
+        .cartrow{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:16px 0;border-bottom:1px solid var(--line)}.cartrow:last-child{border:0}.cartrow strong{white-space:nowrap}
+        .total{text-align:right;margin:20px 0;font-size:20px;font-weight:800}
+        .table{width:100%;border-collapse:collapse}.table th,.table td{text-align:left;padding:12px 9px;border-bottom:1px solid var(--line);font-size:13px}.table th{color:var(--muted);font-size:11px}
+        .formgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.formgrid input,.formgrid textarea,.auth input{width:100%;padding:11px;border:1px solid var(--line);border-radius:7px}.formgrid textarea{grid-column:1/-1;min-height:75px}
+        .auth{max-width:440px;margin:35px auto}.auth h2{margin-top:0}.auth label{display:block;margin:14px 0;font-size:13px;font-weight:700}.auth input{display:block;margin-top:7px}.tabs{display:flex;gap:8px;margin:17px 0}
+        .detail{display:grid;grid-template-columns:260px 1fr;gap:28px}.detail img{max-width:100%;max-height:340px;object-fit:contain}.detail-cover{min-height:300px;background:#eef0f8;display:grid;place-items:center;padding:20px}
+        footer{padding:22px 0;color:var(--muted);font-size:12px;border-top:1px solid var(--line);margin-top:30px}
+        @media(max-width:850px){.top{height:auto;min-height:70px;flex-wrap:wrap;padding:12px 4%}.search{order:3;max-width:none;flex-basis:100%}.nav{margin-left:auto}.layout{grid-template-columns:1fr}.filters{order:2}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hero-icon{font-size:70px}}
+        @media(max-width:550px){.subnav{gap:15px;overflow:auto;white-space:nowrap}.hero{padding:26px}.hero-icon{display:none}.grid{grid-template-columns:1fr}.detail{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr}.formgrid textarea{grid-column:auto}.container{width:94%}}
+    </style>
+</head>
+<body>
+
+<header class="top">
+    <a class="logo" href="/" onclick="return go(event,'/')"><span>📚</span> BookStore</a>
+    <div class="search">
+        <input id="searchInput" placeholder="Search books by title or author">
+        <button onclick="searchBooks()">Search</button>
+    </div>
+    <nav class="nav">
+        <a href="/login" onclick="return go(event,'/login')">Login / Register</a>
+        <a href="/admin" onclick="return go(event,'/admin')">Admin</a>
+        <a class="cartlink" href="/cart" onclick="return go(event,'/cart')">Cart 🛒 <span id="cartCount">0</span></a>
+    </nav>
+</header>
+
+<div class="subnav">
+    <a href="/" onclick="return go(event,'/')">Home</a>
+    <a href="/#catalog" onclick="return go(event,'/')">Books</a>
+    <a href="/cart" onclick="return go(event,'/cart')">Shopping cart</a>
+    <a href="/admin" onclick="return go(event,'/admin')">Books Admin</a>
+</div>
+
+<main class="container">
+    <section id="notice" class="notice"></section>
+
+    <section id="storeView" class="view">
+        <div class="hero">
+            <div>
+                <small>WELCOME TO BOOKSTORE</small>
+                <h1>Find a book.<br>Find a new world.</h1>
+                <p>Explore memorable stories, discover new authors, and find your next favorite read.</p>
+                <button class="btn" onclick="document.querySelector('#catalog').scrollIntoView({behavior:'smooth'})">Browse books →</button>
+            </div>
+            <div class="hero-icon">📖</div>
+        </div>
+
+        <div class="layout" id="catalog">
+            <aside class="panel filters">
+                <h3>Filter options</h3>
+                <div class="filtergroup">
+                    <strong>Price range</strong>
+                    <div class="prices">
+                        <input id="minPrice" type="number" min="0" placeholder="Min">
+                        <input id="maxPrice" type="number" min="0" placeholder="Max">
+                    </div>
+                    <button class="btn wide" onclick="filterPrice()">Apply price</button>
+                </div>
+                <div class="filtergroup">
+                    <strong>Shop by category</strong>
+                    <div id="categoryList"></div>
+                </div>
+                <button class="btn secondary wide" onclick="resetFilters()">Reset filters</button>
+            </aside>
+
+            <section class="panel">
+                <div class="headrow">
+                    <div><h2>Books</h2><span id="bookCount" class="muted"></span></div>
+                    <select id="sort" onchange="sortBooks()" class="btn secondary">
+                        <option value="default">Featured</option>
+                        <option value="title">Title A–Z</option>
+                        <option value="price">Price: low to high</option>
+                    </select>
+                </div>
+                <div id="bookGrid" class="grid"></div>
+            </section>
+        </div>
+    </section>
+
+    <section id="detailsView" class="view panel">
+        <div class="headrow"><h2>Book details</h2><a href="/" onclick="return go(event,'/')">← Back to books</a></div>
+        <div id="detailsContent"></div>
+    </section><section id="loginView" class="view panel auth">
+    <h2 id="authTitle">Welcome back</h2>
+    <p id="authSubtitle" class="muted">Sign in to continue.</p>
+
+    <div class="tabs">
+        <button class="btn" type="button" onclick="setAuthMode(false)">Sign in</button>
+        <button class="btn secondary" type="button" onclick="setAuthMode(true)">Register</button>
+    </div>
+
+    <form id="authForm">
+        <label id="usernameLabel" style="display:none">Username
+            <input id="usernameInput" autocomplete="username">
+        </label>
+        <label>Email
+            <input id="emailInput" type="email" required>
+        </label>
+        <label>Password
+            <input id="passwordInput" type="password" minlength="6" required>
+        </label>
+        <button id="authSubmit" class="btn" type="submit">Sign in</button>
+    </form>
+</section>
+
+    <section id="cartView" class="view panel">
+        <div class="headrow">
+            <div>
+                <h2>Your basket</h2>
+                <p class="muted">Review the books you selected.</p>
+            </div>
+            <a class="btn secondary" href="/" onclick="return go(event,'/')">
+                Continue shopping
+            </a>
+        </div>
+
+        <div id="cartItems"></div>
+        <div id="cartTotal" class="total"></div>
+
+        <div class="actions" style="justify-content:space-between;margin-top:18px">
+            <button class="btn danger" onclick="clearCart()">Clear basket</button>
+            <button id="buyButton" class="btn" onclick="showCheckout()" disabled>Buy now</button>
+        </div>
+
+        <form id="checkoutForm" class="panel" style="display:none;margin-top:18px">
+            <h3>Delivery details</h3>
+            <label>Customer name
+                <input id="customerName" required>
+            </label>
+            <label>Address
+                <input id="customerAddress" required>
+            </label>
+            <button class="btn" type="submit">Place order</button>
+        </form>
+    </section>
+
+
+    <section id="adminView" class="view panel">
+        <div class="headrow"><div><h2>Books Admin</h2><p class="muted">Manage the bookstore catalog.</p></div></div>
+        <form id="bookForm" class="formgrid">
+            <input id="bookId" type="hidden">
+            <input id="bookTitle" placeholder="Book name" required>
+            <input id="bookAuthor" placeholder="Author" required>
+            <input id="bookPrice" type="number" min="0" step="0.01" placeholder="Price" required>
+            <input id="bookCategory" placeholder="Category name">
+            <input id="bookImage" placeholder="Image URL">
+            <textarea id="bookDescription" placeholder="Description"></textarea>
+            <div style="grid-column:1/-1;display:flex;gap:8px">
+                <button class="btn" type="submit">Save book</button>
+                <button class="btn secondary" type="button" onclick="resetForm()">Cancel</button>
+            </div>
+        </form>
+        <div style="overflow-x:auto;margin-top:25px">
+            <table class="table">
+                <thead><tr><th>ID</th><th>Book name</th><th>Author</th><th>Price</th><th>Actions</th></tr></thead>
+                <tbody id="adminRows"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <footer>© 2025 BookStore · Find your next great read.</footer>
+</main>
+
+<script>
+    const API = '';
+    const $ = s => document.querySelector(s);
+    let books = [];
+    let registerMode = false;
+
+    function esc(v) {
+        return String(v ?? '').replace(/[&<>"']/g, c =>
+            ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
+        );
+    }
+    function money(v) {
+        return new Intl.NumberFormat('en-US').format(Number(v) || 0) + ' ₸';
+    }
+    function notify(text, ok = false) {
+        const el = $('#notice');
+        el.textContent = text;
+        el.className = ok ? 'notice ok' : 'notice';
+        el.style.display = 'block';
+        setTimeout(() => el.style.display = 'none', 4500);
+    }
+    async function api(path, options = {}) {
+        const response = await fetch(API + path, {
+            ...options,
+            headers: {'Content-Type':'application/json', ...(options.headers || {})}
+        });
+        const text = await response.text();
+        let result;
+        try { result = text ? JSON.parse(text) : null; } catch { result = text; }
+        if (!response.ok) throw new Error(typeof result === 'string' ? result : `Request failed (${response.status})`);
+        return result;
+    }
+    function go(event, path) {
+        event.preventDefault();
+        history.pushState({}, '', path);
+        route();
+        return false;
+    }
+    window.onpopstate = route;
+
+    function route() {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        const path = location.pathname;
+
+        if (path === '/login') {
+            $('#loginView').classList.add('active');
+        } else if (path === '/cart') {
+            $('#cartView').classList.add('active');
+            loadCart();
+        } else if (path === '/admin') {
+            $('#adminView').classList.add('active');
+            loadAdmin();
+        } else if (path === '/details') {
+            $('#detailsView').classList.add('active');
+            loadDetails(new URLSearchParams(location.search).get('id'));
+        } else {
+            $('#storeView').classList.add('active');
+            loadBooks();
+        }
+    }
+
+    async function loadCategories() {
+        try {
+            const list = await api('/api/categories');
+            $('#categoryList').innerHTML = list.map(c => `
+      <label><input class="category-check" type="checkbox" value="${esc(c.id)}">
+      ${esc(c.name)}</label>
+    `).join('');
+            document.querySelectorAll('.category-check').forEach(x => x.onchange = () => {
+                const selected = document.querySelector('.category-check:checked');
+                loadBooks(selected ? `/api/books/category/${selected.value}` : '/api/books');
+            });
+        } catch (e) { notify('Could not load categories: ' + e.message); }
+    }
+
+    async function loadBooks(path = '/api/books') {
+        try {
+            books = await api(path);
+            sortBooks();
+        } catch (e) {
+            $('#bookGrid').innerHTML = '<p class="muted">Books could not be loaded.</p>';
+            notify(e.message);
+        }
+    }
+
+    function sortBooks() {
+        const list = [...books];
+        if ($('#sort').value === 'title') list.sort((a,b) => (a.title||'').localeCompare(b.title||''));
+        if ($('#sort').value === 'price') list.sort((a,b) => Number(a.price)-Number(b.price));
+        $('#bookCount').textContent = `${list.length} books`;
+        $('#bookGrid').innerHTML = list.length ? list.map(b => `
+    <article class="book">
+      <div class="cover">
+        ${b.imageUrl ? `<img src="${esc(b.imageUrl)}" alt="${esc(b.title)}">`
+            : `<div class="fallback">${esc(b.title || 'Book')}</div>`}
+      </div>
+      <div class="bookbody">
+        <div class="category">${esc(b.categoryName || 'Uncategorized')}</div>
+        <h3>${esc(b.title || 'Untitled book')}</h3>
+        <div class="author">by ${esc(b.author || 'Unknown author')}</div>
+        <div class="desc">${esc(b.description || 'No description available.')}</div>
+        <div class="price">${money(b.price)}</div>
+        <div class="actions">
+          <button class="btn small" onclick="addToCart(${Number(b.id)})">Add to cart</button>
+          <button class="btn secondary small" onclick="goDetails(${Number(b.id)})">Details</button>
+        </div>
+      </div>
+    </article>
+  `).join('') : '<p class="muted">No books found.</p>';
+    }
+
+    function goDetails(id) {
+        history.pushState({}, '', '/details?id=' + encodeURIComponent(id));
+        route();
+    }
+    async function loadDetails(id) {
+        if (!id) { $('#detailsContent').textContent = 'Book ID is missing.'; return; }
+        try {
+            const b = await api('/api/books/' + encodeURIComponent(id));
+            $('#detailsContent').innerHTML = `
+      <div class="detail">
+        <div class="detail-cover">${b.imageUrl ? `<img src="${esc(b.imageUrl)}" alt="${esc(b.title)}">` : `<div class="fallback">${esc(b.title)}</div>`}</div>
+        <div>
+          <div class="category">${esc(b.categoryName || 'Uncategorized')}</div>
+          <h1>${esc(b.title)}</h1>
+          <p class="muted">by ${esc(b.author || 'Unknown author')}</p>
+          <h2>${money(b.price)}</h2>
+          <p style="line-height:1.7">${esc(b.description || 'No description available.')}</p>
+          <button class="btn" onclick="addToCart(${Number(b.id)})">Add to cart</button>
+        </div>
+      </div>`;
+        } catch (e) { $('#detailsContent').textContent = e.message; }
+    }
+
+    async function searchBooks() {
+        const keyword = $('#searchInput').value.trim();
+        if (!keyword) return loadBooks();
+        try { books = await api('/api/books/search?keyword=' + encodeURIComponent(keyword)); sortBooks(); }
+        catch (e) { notify(e.message); }
+    }
+    $('#searchInput').onkeydown = e => { if (e.key === 'Enter') searchBooks(); };
+
+    async function filterPrice() {
+        const min = $('#minPrice').value, max = $('#maxPrice').value;
+        if (min === '' || max === '' || Number(min) > Number(max)) {
+            notify('Enter a valid minimum and maximum price.'); return;
+        }
+        try {
+            books = await api(`/api/books/price?minPrice=${encodeURIComponent(min)}&maxPrice=${encodeURIComponent(max)}`);
+            sortBooks();
+        } catch (e) { notify(e.message); }
+    }
+    function resetFilters() {
+        $('#minPrice').value = ''; $('#maxPrice').value = ''; $('#searchInput').value = '';
+        document.querySelectorAll('.category-check').forEach(c => c.checked = false);
+        loadBooks();
+    }
+
+    async function addToCart(bookId) {
+        try {
+            let cartId = localStorage.getItem('kitapCart');
+            if (!cartId) {
+                const cart = await api('/api/cart', {method:'POST'});
+                cartId = cart.id;
+                localStorage.setItem('kitapCart', cartId);
+            }
+            await api(`/api/cart/${cartId}/add?bookId=${bookId}&quanity=1`, {method:'POST'});
+            await updateCartCount();
+            notify('Book added to cart.', true);
+        } catch (e) {
+            if (/out of stock|sold out|not available/i.test(e.message)) notify('Sorry, this book is out of stock.');
+            else notify(e.message);
+        }
+    }
+
+    async function updateCartCount() {
+        const id = localStorage.getItem('kitapCart');
+        if (!id) { $('#cartCount').textContent = '0'; return; }
+        try {
+            const items = await api('/api/cart/' + id);
+            $('#cartCount').textContent = items.reduce((n,x) => n + Number(x.quanity || 0), 0);
+        } catch { $('#cartCount').textContent = '0'; }
+    }
+
+    async function loadCart() {
+        const id = localStorage.getItem('kitapCart');
+        if (!id) { $('#cartItems').innerHTML = '<p class="muted">Your basket is empty.</p>'; $('#cartTotal').textContent = ''; return; }
+        try {
+            const items = await api('/api/cart/' + id);
+            if (!items.length) { $('#cartItems').innerHTML = '<p class="muted">Your basket is empty.</p>'; $('#cartTotal').textContent = ''; return; }
+            $('#cartItems').innerHTML = items.map(x => `
+      <div class="cartrow">
+        <div><strong>${esc(x.bookTitle)}</strong><div class="muted">Quantity: ${Number(x.quanity || 0)}</div></div>
+        <strong>${money(Number(x.price || 0) * Number(x.quanity || 0))}</strong>
+      </div>`).join('');
+            const sum = items.reduce((n,x) => n + Number(x.price || 0) * Number(x.quanity || 0), 0);
+            $('#cartTotal').textContent = 'Total: ' + money(sum);
+        } catch (e) { $('#cartItems').textContent = e.message; }
+    }
+    async function clearCart() {
+        const id = localStorage.getItem('kitapCart');
+        if (!id) return;
+        try {
+            await api('/api/cart/' + id, {method:'DELETE'});
+            await loadCart(); await updateCartCount(); notify('Basket cleared.', true);
+        } catch (e) { notify(e.message); }
+    }
+
+    async function loadAdmin() {
+        try {
+            const list = await api('/api/admin/books');
+            $('#adminRows').innerHTML = list.map(b => `
+      <tr>
+        <td>${esc(b.id)}</td><td>${esc(b.title)}</td><td>${esc(b.author)}</td><td>${money(b.price)}</td>
+        <td>
+          <button class="btn secondary small" onclick="editBook(${Number(b.id)})">Edit</button>
+          <button class="btn danger small" onclick="deleteBook(${Number(b.id)})">Delete</button>
+        </td>
+      </tr>`).join('');
+        } catch (e) { $('#adminRows').innerHTML = `<tr><td colspan="5">${esc(e.message)}</td></tr>`; }
+    }
+    async function editBook(id) {
+        try {
+            const b = await api('/api/books/' + id);
+            $('#bookId').value = b.id; $('#bookTitle').value = b.title || '';
+            $('#bookAuthor').value = b.author || ''; $('#bookPrice').value = b.price ?? '';
+            $('#bookCategory').value = b.categoryName || ''; $('#bookImage').value = b.imageUrl || '';
+            $('#bookDescription').value = b.description || '';
+            window.scrollTo({top:0,behavior:'smooth'});
+        } catch (e) { notify(e.message); }
+    }
+    async function deleteBook(id) {
+        if (!confirm('Delete this book?')) return;
+        try { await api('/api/admin/books/' + id,{method:'DELETE'}); await loadAdmin(); notify('Book deleted.',true); }
+        catch (e) { notify(e.message); }
+    }
+    function resetForm() { $('#bookForm').reset(); $('#bookId').value = ''; }
+
+    $('#bookForm').onsubmit = async e => {
+        e.preventDefault();
+        const id = $('#bookId').value;
+        const dto = {
+            title: $('#bookTitle').value.trim(),
+            author: $('#bookAuthor').value.trim(),
+            price: Number($('#bookPrice').value),
+            categoryName: $('#bookCategory').value.trim(),
+            imageUrl: $('#bookImage').value.trim(),
+            description: $('#bookDescription').value.trim()
+        };
+        try {
+            await api('/api/admin/books' + (id ? '/' + id : ''), {
+                method: id ? 'PUT' : 'POST',
+                body: JSON.stringify(dto)
+            });
+            resetForm(); await loadAdmin(); notify(id ? 'Book updated.' : 'Book added.',true);
+        } catch (error) { notify(error.message); }
+    };
+
+    function setAuthMode(register) {
+        registerMode = register;
+        $('#usernameLabel').style.display = register ? 'block' : 'none';
+        $('#usernameInput').required = register;
+        $('#authTitle').textContent = register ? 'Create an account' : 'Welcome back';
+        $('#authSubtitle').textContent = register ? 'Register to explore the bookstore.' : 'Sign in to your account.';
+        $('#authSubmit').textContent = register ? 'Register' : 'Sign in';
+    }
+    $('#authForm').onsubmit = async e => {
+        e.preventDefault();
+        const payload = registerMode
+            ? {userName:$('#usernameInput').value.trim(),email:$('#emailInput').value.trim(),password:$('#passwordInput').value}
+            : {email:$('#emailInput').value.trim(),password:$('#passwordInput').value};
+        try {
+            const result = await api(registerMode ? '/api/auth/register' : '/api/auth/login',{
+                method:'POST',body:JSON.stringify(payload)
+            });
+            localStorage.setItem('kitapUser',JSON.stringify(result));
+            history.pushState({},'', '/');
+            route();
+            notify(registerMode ? 'Account created.' : 'Signed in.',true);
+        } catch (error) { notify(error.message); }
+    };
+
+    loadCategories();
+    updateCartCount();
+    route();
+</script>
+</body>
+</html>

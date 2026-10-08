@@ -1,0 +1,51 @@
+<h1 class="text-3xl font-bold mb-8">
+    Books
+</h1>
+
+
+<!-- SEARCH -->
+
+<div class="bg-white p-5 rounded-xl shadow-sm mb-8">
+
+    <div class="grid md:grid-cols-3 gap-4">
+
+        <input
+                id="search-input"
+                type="text"
+                placeholder="Search books..."
+                class="border p-3 rounded-lg">
+
+        <select
+                id="category-filter"
+                class="border p-3 rounded-lg">
+
+            <option value="">
+                All categories
+            </option>
+
+        </select>
+
+        <button
+                onclick="loadBooks()"
+                class="bg-blue-600 text-white rounded-lg">
+
+            🔎 Search
+
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- BOOKS -->
+
+<div
+        id="books-container"
+        class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
+    <div class="text-gray-500">
+        Loading books...
+    </div>
+
+</div>
