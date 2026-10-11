@@ -6,8 +6,10 @@ import Book.bitlab.BookStore.dto.RegestrationDTO;
 import Book.bitlab.BookStore.repositories.RoleRepository;
 import Book.bitlab.BookStore.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -20,24 +22,54 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
+
     public User register(RegestrationDTO dto) {
 
-        if (userRepository.existsByEmail(dto.getEmail())) {
-            throw new RuntimeException("Email already exists");
+        // DTO және өрістерді тексеру
+        if (dto == null
+                || dto.getEmail() == null
+                || dto.getEmail().isBlank()
+                || dto.getUserName() == null
+                || dto.getUserName().isBlank()
+                || dto.getPassword() == null
+                || dto.getPassword().length() < 8) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Email, username және кемінде 8 таңбалы пароль енгізіңіз"
+            );
         }
 
-        if (userRepository.existsByUsername(dto.getUserName())) {
-            throw new RuntimeException("Username already exists");
+        String email = dto.getEmail().trim().toLowerCase();
+        String username = dto.getUserName().trim();
+
+        // Email бұрын тіркелген бе?
+        if (userRepository.existsByEmail(email)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Бұл email бұрын тіркелген"
+            );
         }
 
+        // Username бұрын тіркелген бе?
+        if (userRepository.existsByUsername(username)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Бұл username бұрын тіркелген"
+            );
+        }
+
+        // Жаңа пайдаланушыға ROLE_USER беру
         Role role = roleRepository.findByName("ROLE_USER")
-                .orElseThrow(() ->
-                        new RuntimeException("ROLE_USER not found")
-                );
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        "ROLE_USER рөлі табылмады"
+                ));
 
+        // Парольді хэштеу және пайдаланушыны жасау
         User user = User.builder()
-                .username(dto.getUserName())
-                .email(dto.getEmail())
+                .username(username)
+                .email(email)
                 .password(passwordEncoder.encode(dto.getPassword()))
                 .roles(new HashSet<>(Set.of(role)))
                 .build();
@@ -45,15 +77,32 @@ public class UserService {
         return userRepository.save(user);
     }
 
+
     public User login(String email, String password) {
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new RuntimeException("User not found")
-                );
+        if (email == null || email.isBlank()
+                || password == null || password.isBlank()) {
 
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Email немесе пароль қате"
+            );
+        }
+
+        // Email бойынша пайдаланушыны табу
+        User user = userRepository.findByEmail(
+                email.trim().toLowerCase()
+        ).orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                "Email немесе пароль қате"
+        ));
+
+        // Енгізілген парольді сақталған хэшпен салыстыру
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new RuntimeException("Wrong password");
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Email немесе пароль қате"
+            );
         }
 
         return user;

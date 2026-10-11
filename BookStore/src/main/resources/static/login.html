@@ -170,7 +170,7 @@
       <label>
         Құпия сөз
         <input id="password" type="password"
-               autocomplete="current-password" minlength="6" required>
+               autocomplete="current-password" minlength="8" required>
       </label>
 
       <button class="submit" id="submit" type="submit">Аккаунтқа кіру</button>
@@ -207,6 +207,30 @@
   $('#loginTab').onclick = () => setMode(false);
   $('#registerTab').onclick = () => setMode(true);
 
+  async function post(url, payload) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const text = await response.text();
+    let result;
+    try {
+      result = text ? JSON.parse(text) : null;
+    } catch {
+      result = text;
+    }
+
+    if (!response.ok) {
+      const message =
+              (result && typeof result === 'object' && (result.error || result.message))
+              || 'Мәліметтерді тексеріп, қайта көріңіз.';
+      throw new Error(message);
+    }
+    return result;
+  }
+
   $('#authForm').onsubmit = async event => {
     event.preventDefault();
 
@@ -214,48 +238,26 @@
     button.disabled = true;
     button.textContent = 'Күте тұрыңыз…';
 
-    const payload = isRegister
-            ? {
-              username: $('#username').value.trim(),
-              email: $('#email').value.trim(),
-              password: $('#password').value
-            }
-            : {
-              email: $('#email').value.trim(),
-              password: $('#password').value
-            };
+    const email = $('#email').value.trim();
+    const password = $('#password').value;
 
     try {
-      const response = await fetch(
-              isRegister ? '/api/auth/register' : '/api/auth/login',
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-              }
-      );
-
-      const text = await response.text();
-      let result;
-
-      try {
-        result = text ? JSON.parse(text) : null;
-      } catch {
-        result = text;
+      if (isRegister) {
+        // Backend өрісі: userName
+        await post('/api/auth/register', {
+          userName: $('#username').value.trim(),
+          email,
+          password
+        });
       }
 
-      if (!response.ok) {
-        throw new Error(
-                typeof result === 'string'
-                        ? result
-                        : 'Мәліметтерді тексеріп, қайта көріңіз.'
-        );
-      }
+      // Тіркелгеннен кейін де автоматты түрде кіреміз
+      const result = await post('/api/auth/login', { email, password });
 
-      localStorage.setItem(
-              'kitapUser',
-              result.username || result.email || payload.email
-      );
+      localStorage.setItem('token', result.token);
+      localStorage.setItem('kitapUser', JSON.stringify(
+              result.user || { email, username: email, roles: [] }
+      ));
 
       location.href = '/';
     } catch (error) {

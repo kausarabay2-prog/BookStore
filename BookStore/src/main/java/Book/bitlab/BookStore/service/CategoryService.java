@@ -1,80 +1,73 @@
 package Book.bitlab.BookStore.service;
-import Book.bitlab.BookStore.Entity.Book;
+
 import Book.bitlab.BookStore.Entity.Category;
-import Book.bitlab.BookStore.Mapper.BookMapper;
-import Book.bitlab.BookStore.dto.BookDTO;
 import Book.bitlab.BookStore.dto.CategoryDTO;
-import Book.bitlab.BookStore.repositories.BookRepository;
-import Book.bitlab.BookStore.repositories.CategoryRepository; import lombok.RequiredArgsConstructor; import org.springframework.stereotype.Service;
+import Book.bitlab.BookStore.repositories.CategoryRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
 import java.util.List;
-@Service @RequiredArgsConstructor public class CategoryService {
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class CategoryService {
 
     private final CategoryRepository categoryRepository;
-    private final BookMapper bookMapper;
-    private final BookRepository bookRepository;
 
-    public List<Category> getAll() {
-        return categoryRepository.findAll();
-    }
-
-    public BookDTO create(BookDTO dto) {
-
-        Category category =
-                categoryRepository
-                        .findByNameIgnoreCase(dto.getCategoryName())
-                        .orElseGet(() ->
-                                categoryRepository.save(
-                                        Category.builder()
-                                                .name(dto.getCategoryName())
-                                                .build()
-                                )
-                        );
-
-        Book book = Book.builder()
-                .title(dto.getTitle())
-                .author(dto.getAuthor())
-                .price(dto.getPrice())
-                .description(dto.getDescription())
-                .imageURL(dto.getImageUrl())
-                .category(category)
+    private CategoryDTO toDto(Category category) {
+        return CategoryDTO.builder()
+                .id(category.getId())
+                .name(category.getName())
                 .build();
-
-        return bookMapper.toDto(
-                bookRepository.save(book)
-        );
     }
 
-    public Category create(CategoryDTO dto) {
-
-        Category category = Category.builder()
-                .name(dto.getName())
-                .build();
-
-        return categoryRepository.save(category);
-    }
-    public Category getById(Long id) {
-
-        return categoryRepository
-                .findById(id)
-                .orElseThrow(() ->
-                        new RuntimeException("Category not found"));
+    private Category find(Long id) {
+        return categoryRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Category not found: " + id));
     }
 
-    public Category update(Long id, CategoryDTO dto) {
+    private String cleanName(CategoryDTO dto) {
+        if (dto == null || dto.getName() == null || dto.getName().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category name is required");
+        }
+        return dto.getName().trim();
+    }
 
-        Category category = getById(id);
+    @Transactional(readOnly = true)
+    public List<CategoryDTO> getAll() {
+        return categoryRepository.findAll().stream().map(this::toDto).toList();
+    }
 
-        category.setName(dto.getName());
+    @Transactional(readOnly = true)
+    public CategoryDTO getById(Long id) {
+        return toDto(find(id));
+    }
 
-        return categoryRepository.save(category);
+    public CategoryDTO create(CategoryDTO dto) {
+        String name = cleanName(dto);
+
+        if (categoryRepository.findByNameIgnoreCase(name).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Category already exists");
+        }
+
+        return toDto(categoryRepository.save(Category.builder().name(name).build()));
+    }
+
+    public CategoryDTO update(Long id, CategoryDTO dto) {
+        Category category = find(id);
+        category.setName(cleanName(dto));
+        return toDto(categoryRepository.save(category));
     }
 
     public void delete(Long id) {
-
         if (!categoryRepository.existsById(id)) {
-            throw new RuntimeException("Category not found");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found: " + id);
         }
-
         categoryRepository.deleteById(id);
     }
 }

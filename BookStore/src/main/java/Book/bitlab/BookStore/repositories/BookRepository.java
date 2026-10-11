@@ -3,6 +3,7 @@ package Book.bitlab.BookStore.repositories;
 import Book.bitlab.BookStore.Entity.Book;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Arrays;
 import java.util.List;
 
 public interface BookRepository extends JpaRepository<Book,Long> {
@@ -11,4 +12,6 @@ public interface BookRepository extends JpaRepository<Book,Long> {
     List<Book> findByPriceBetween(Double minPrice, Double maxPrice);
 
     List<Book> category_Id(Long categoryId);
+
+    Arrays findByTitleContainingIgnoreCaseOrAuthorContainingIgnoreCase(String title, String author);
 }

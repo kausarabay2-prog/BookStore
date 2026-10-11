@@ -6,7 +6,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class PageController {
 
-    @GetMapping("/")
+
+    @GetMapping({"/", "/books", "/cart", "/details"})
     public String home() {
         return "forward:/index.html";
     }
@@ -16,18 +17,13 @@ public class PageController {
         return "forward:/login.html";
     }
 
-    @GetMapping("/cart")
-    public String cart() {
-        return "forward:/cart.html";
+    @GetMapping("/register")
+    public String register() {
+        return "forward:/login.html";
     }
 
     @GetMapping("/admin")
     public String admin() {
         return "forward:/admin.html";
-    }
-
-    @GetMapping("/details")
-    public String details() {
-        return "forward:/details.html";
     }
 }

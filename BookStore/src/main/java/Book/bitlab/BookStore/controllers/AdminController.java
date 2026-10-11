@@ -23,12 +23,15 @@ public class AdminController {
         return  ResponseEntity.ok(bookService.create(bookDTO));
     }
 
-    @PutMapping("/books/{id}")
-    public ResponseEntity<?> updateBook(@PathVariable Long id,
-                                        @RequestBody BookDTO bookDTO){
-        return ResponseEntity.ok(bookService.update(id, bookDTO));
 
+    @PutMapping("/books/{id}")
+    public ResponseEntity<BookDTO> updateBook(
+            @PathVariable Long id,
+            @RequestBody BookDTO bookDTO
+    ) {
+        return ResponseEntity.ok(bookService.update(id, bookDTO));
     }
+
     @DeleteMapping("/books/{id}")
     public ResponseEntity<?> deleteBook(@PathVariable Long id){
         bookService.delete(id);

@@ -73,126 +73,111 @@ async function handleLogin(event) {
     try {
         const response = await fetch(`${API}/api/auth/login`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({ email, password })
         });
 
+        const data = await response.json();
+
         if (!response.ok) {
-            const error = await response.text();
-            alert(error || 'Login failed');
+            alert(data.message || data.error || 'Login failed');
             return;
         }
 
-        const user = await response.json();
-        localStorage.setItem('kitapUser', JSON.stringify(user));
+        const token = typeof data === 'string' ? data : data.token;
+
+        if (!token) {
+            console.error('Login response:', data);
+            alert('Login response does not contain a token. Check the backend response.');
+            return;
+        }
+
+        localStorage.setItem('token', token);
+        localStorage.setItem('kitapUser', JSON.stringify(data));
 
         alert('Login successful!');
         history.replaceState({}, '', '/');
         route();
+
     } catch (error) {
+        console.error('Login error:', error);
         alert('Could not connect to the server.');
-        console.error(error);
-    }
-}
-
-async function loadCartItems() {
-    const cartId = localStorage.getItem('kitapCart');
-    const cartItems = document.querySelector('#cartItems');
-
-    if (!cartId) {
-        if (cartItems) cartItems.innerHTML = '<p>Your cart is empty.</p>';
-        const count = document.querySelector('#cartCount');
-        if (count) count.textContent = '0';
-        return [];
     }
 
-    try {
-        const response = await fetch(`${API}/api/cart/${cartId}`);
-        if (!response.ok) throw new Error(`Could not load cart (${response.status})`);
+    const token = data.token || data.accessToken || data.jwt;
 
-        const items = await response.json();
-        const count = document.querySelector('#cartCount');
-
-        if (count) {
-            count.textContent = items.reduce(
-                (sum, item) => sum + Number(item.quanity || 0),
-                0
-            );
-        }
-
-        if (cartItems) {
-            cartItems.innerHTML = items.length
-                ? items.map(item => `
-                    <div class="cart-row">
-                        <span>${escapeHtml(item.bookTitle)} × ${Number(item.quanity || 0)}</span>
-                        <b>${money(Number(item.price || 0) * Number(item.quanity || 0))}</b>
-                    </div>
-                  `).join('')
-                : '<p>Your cart is empty.</p>';
-        }
-
-        const total = items.reduce(
-            (sum, item) =>
-                sum + Number(item.price || 0) * Number(item.quanity || 0),
-            0
-        );
-
-        const totalElement = document.querySelector('#cartTotal');
-        if (totalElement) totalElement.textContent = items.length ? `Total: ${money(total)}` : '';
-
-        return items;
-    } catch (error) {
-        console.error('Failed to load cart items:', error);
-        notify(error.message);
-        return [];
+    if (!token) {
+        throw new Error('Login response did not include a JWT token');
     }
-}
 
-async function openCart() {
-    await loadCartItems();
-    document.querySelector('#cartModal')?.classList.add('show');
-}
 
-async function clearCart() {
-    const cartId = localStorage.getItem('kitapCart');
-    if (!cartId) return;
+    const response = await fetch('/api/admin/books', {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    localStorage.setItem('token', data.token);
+    headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`
 
-    try {
-        const response = await fetch(`${API}/api/cart/${cartId}`, {
-            method: 'DELETE'
-        });
+        async function updateBook(id, bookData) {
+            const token = localStorage.getItem("token");
 
-        if (!response.ok) throw new Error(`Could not clear cart (${response.status})`);
-
-        await loadCartItems();
-    } catch (error) {
-        notify(error.message);
-    }window.selectBook = async function(id) {
-        try {
-            const book = await api('/api/books/' + encodeURIComponent(id));
-            const details = $('#bookDetails') || $('#detailsContent');
-
-            if (!details) {
-                notify('Add a details container with id="bookDetails" to the HTML.');
-                return;
+            if (!token) {
+                throw new Error("Алдымен жүйеге кіріңіз.");
             }
 
-            details.innerHTML = `
-            <table class="details">
-                <tr><td>Book ID</td><td>${esc(book.id)}</td></tr>
-                <tr><td>Book Name</td><td>${esc(book.title)}</td></tr>
-                <tr><td>Book Author</td><td>${esc(book.author)}</td></tr>
-                <tr><td>Book Price</td><td>${money(book.price)}</td></tr>
-                <tr><td>Category</td><td>${esc(book.categoryName || '')}</td></tr>
-                <tr><td>Description</td><td>${esc(book.description || '')}</td></tr>
-            </table>
-            ${book.imageUrl
-                ? `<img class="cover" src="${esc(book.imageUrl)}" alt="${esc(book.title)}">`
-                : ''}
-        `;
-        } catch (error) {
-            notify(error.message);
+            const response = await fetch(`/api/admin/books/${id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify(bookData)
+            });
+
+            if (!response.ok) {
+                const message = await response.text();
+                throw new Error(`Кітап жаңартылмады (${response.status}): ${message}`);
+            }
+
+            return await response.json();
         }
-    };
-    
+
+        async function saveBookChanges(id) {
+            try {
+                const bookData = {
+                    title: document.getElementById("title").value.trim(),
+                    author: document.getElementById("author").value.trim(),
+                    price: Number(document.getElementById("price").value),
+                    description: document.getElementById("description").value.trim(),
+                    imageUrl: document.getElementById("imageUrl").value.trim(),
+                    categoryId: Number(document.getElementById("categoryId").value)
+                };
+
+                if (!bookData.title || !bookData.author) {
+                    alert("Кітаптың атауы мен авторын толтыр.");
+                    return;
+                }
+
+                if (!Number.isFinite(bookData.price) || bookData.price < 0) {
+                    alert("Кітап бағасын дұрыс енгіз.");
+                    return;
+                }
+
+                const updatedBook = await updateBook(id, bookData);
+
+                alert("Кітап сәтті жаңартылды!");
+                console.log("Updated book:", updatedBook);
+
+                // Жобаңа сәйкес кітаптар тізімін қайта жүкте.
+                // Мысалы: await loadBooks();
+
+            } catch (error) {
+                console.error(error);
+                alert(error.message);
+            }
+        }
+
+    }
 }

@@ -1,5 +1,5 @@
 package Book.bitlab.BookStore.controllers;
-import Book.bitlab.BookStore.Entity.Category; import Book.bitlab.BookStore.dto.CategoryDTO; import Book.bitlab.BookStore.service.CategoryService; import lombok.RequiredArgsConstructor; import org.springframework.http.ResponseEntity; import org.springframework.web.bind.annotation.*;
+import Book.bitlab.BookStore.dto.CategoryDTO; import Book.bitlab.BookStore.service.CategoryService; import lombok.RequiredArgsConstructor; import org.springframework.http.ResponseEntity; import org.springframework.web.bind.annotation.*;
 import java.util.List;
 @RestController @RequestMapping("/api/categories")
 @RequiredArgsConstructor
@@ -9,14 +9,14 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @GetMapping
-    public ResponseEntity<List<Category>> getAll() {
+    public ResponseEntity<List<CategoryDTO>> getAll() {
         return ResponseEntity.ok(
                 categoryService.getAll()
         );
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Category> getById(
+    public ResponseEntity<CategoryDTO> getById(
             @PathVariable Long id
     ) {
         return ResponseEntity.ok(
@@ -25,7 +25,7 @@ public class CategoryController {
     }
 
     @PostMapping
-    public ResponseEntity<Category> create(
+    public ResponseEntity<CategoryDTO> create(
             @RequestBody CategoryDTO dto
     ) {
         return ResponseEntity.ok(
@@ -34,7 +34,7 @@ public class CategoryController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Category> update(
+    public ResponseEntity<CategoryDTO> update(
             @PathVariable Long id,
             @RequestBody CategoryDTO dto
     ) {

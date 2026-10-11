@@ -32,5 +32,26 @@ function route() {
     } else {
         $('#storeView').classList.add('active');
         loadBooks();
+
+        async function updateBook(id, bookData) {
+            const token = localStorage.getItem("token");
+
+            const response = await fetch(`/api/admin/books/${id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify(bookData)
+            });
+
+            if (!response.ok) {
+                const message = await response.text();
+                throw new Error(`Update failed (${response.status}): ${message}`);
+            }
+
+            return await response.json();
+        }
+
     }
 }

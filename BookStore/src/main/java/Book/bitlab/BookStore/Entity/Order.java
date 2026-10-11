@@ -20,9 +20,15 @@ public class Order {
     private Long id;
 
     private String customerName;
+
     private String address;
+
     private Double totalPrice;
+
     private String status;
+
+    @Column(name = "cart_id")
+    private Long cartId;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     private List<OrderItem> items;

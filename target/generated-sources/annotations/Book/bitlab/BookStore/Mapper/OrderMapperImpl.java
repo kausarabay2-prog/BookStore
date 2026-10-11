@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-10-03T16:24:13+0500",
+    date = "2026-10-10T20:46:05+0500",
     comments = "version: 1.5.5.Final, compiler: javac, environment: Java 21.0.12.1 (Microsoft)"
 )
 @Component
@@ -24,7 +24,9 @@ public class OrderMapperImpl implements OrderMapper {
         OrderDTO.OrderDTOBuilder orderDTO = OrderDTO.builder();
 
         orderDTO.id( order.getId() );
+        orderDTO.customerName( order.getCustomerName() );
         orderDTO.address( order.getAddress() );
+        orderDTO.cartId( order.getCartId() );
         orderDTO.totalPrice( order.getTotalPrice() );
         orderDTO.status( order.getStatus() );
 
@@ -39,10 +41,9 @@ public class OrderMapperImpl implements OrderMapper {
 
         Order.OrderBuilder order = Order.builder();
 
-        order.id( dto.getId() );
+        order.customerName( dto.getCustomerName() );
         order.address( dto.getAddress() );
-        order.totalPrice( dto.getTotalPrice() );
-        order.status( dto.getStatus() );
+        order.cartId( dto.getCartId() );
 
         return order.build();
     }

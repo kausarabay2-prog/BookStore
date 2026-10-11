@@ -57,8 +57,9 @@
         <button onclick="searchBooks()">Search</button>
     </div>
     <nav class="nav">
-        <a href="/login" onclick="return go(event,'/login')">Login / Register</a>
-        <a href="/admin" onclick="return go(event,'/admin')">Admin</a>
+        <a id="authLink" href="/login" onclick="return onAuthLink(event)">Login / Register</a>
+        <button id="logoutBtn" type="button" style="display:none" onclick="logout()">Logout</button>
+        <a class="admin-only" href="/admin" style="display:none">Admin</a>
         <a class="cartlink" href="/cart" onclick="return go(event,'/cart')">Cart 🛒 <span id="cartCount">0</span></a>
     </nav>
 </header>
@@ -67,7 +68,7 @@
     <a href="/" onclick="return go(event,'/')">Home</a>
     <a href="/#catalog" onclick="return go(event,'/')">Books</a>
     <a href="/cart" onclick="return go(event,'/cart')">Shopping cart</a>
-    <a href="/admin" onclick="return go(event,'/admin')">Books Admin</a>
+    <a class="admin-only" href="/admin" style="display:none">Books Admin</a>
 </div>
 
 <main class="container">
@@ -119,28 +120,30 @@
     <section id="detailsView" class="view panel">
         <div class="headrow"><h2>Book details</h2><a href="/" onclick="return go(event,'/')">← Back to books</a></div>
         <div id="detailsContent"></div>
-    </section><section id="loginView" class="view panel auth">
-    <h2 id="authTitle">Welcome back</h2>
-    <p id="authSubtitle" class="muted">Sign in to continue.</p>
+    </section>
 
-    <div class="tabs">
-        <button class="btn" type="button" onclick="setAuthMode(false)">Sign in</button>
-        <button class="btn secondary" type="button" onclick="setAuthMode(true)">Register</button>
-    </div>
+    <section id="loginView" class="view panel auth">
+        <h2 id="authTitle">Welcome back</h2>
+        <p id="authSubtitle" class="muted">Sign in to continue.</p>
 
-    <form id="authForm">
-        <label id="usernameLabel" style="display:none">Username
-            <input id="usernameInput" autocomplete="username">
-        </label>
-        <label>Email
-            <input id="emailInput" type="email" required>
-        </label>
-        <label>Password
-            <input id="passwordInput" type="password" minlength="6" required>
-        </label>
-        <button id="authSubmit" class="btn" type="submit">Sign in</button>
-    </form>
-</section>
+        <div class="tabs">
+            <button class="btn" type="button" onclick="setAuthMode(false)">Sign in</button>
+            <button class="btn secondary" type="button" onclick="setAuthMode(true)">Register</button>
+        </div>
+
+        <form id="authForm">
+            <label id="usernameLabel" style="display:none">Username
+                <input id="usernameInput" autocomplete="username">
+            </label>
+            <label>Email
+                <input id="emailInput" type="email" required>
+            </label>
+            <label>Password
+                <input id="passwordInput" type="password" minlength="8" required>
+            </label>
+            <button id="authSubmit" class="btn" type="submit">Sign in</button>
+        </form>
+    </section>
 
     <section id="cartView" class="view panel">
         <div class="headrow">
@@ -173,30 +176,6 @@
         </form>
     </section>
 
-
-    <section id="adminView" class="view panel">
-        <div class="headrow"><div><h2>Books Admin</h2><p class="muted">Manage the bookstore catalog.</p></div></div>
-        <form id="bookForm" class="formgrid">
-            <input id="bookId" type="hidden">
-            <input id="bookTitle" placeholder="Book name" required>
-            <input id="bookAuthor" placeholder="Author" required>
-            <input id="bookPrice" type="number" min="0" step="0.01" placeholder="Price" required>
-            <input id="bookCategory" placeholder="Category name">
-            <input id="bookImage" placeholder="Image URL">
-            <textarea id="bookDescription" placeholder="Description"></textarea>
-            <div style="grid-column:1/-1;display:flex;gap:8px">
-                <button class="btn" type="submit">Save book</button>
-                <button class="btn secondary" type="button" onclick="resetForm()">Cancel</button>
-            </div>
-        </form>
-        <div style="overflow-x:auto;margin-top:25px">
-            <table class="table">
-                <thead><tr><th>ID</th><th>Book name</th><th>Author</th><th>Price</th><th>Actions</th></tr></thead>
-                <tbody id="adminRows"></tbody>
-            </table>
-        </div>
-    </section>
-
     <footer>© 2025 BookStore · Find your next great read.</footer>
 </main>
 
@@ -206,6 +185,7 @@
     let books = [];
     let registerMode = false;
 
+    // ---------- helpers ----------
     function esc(v) {
         return String(v ?? '').replace(/[&<>"']/g, c =>
             ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
@@ -221,17 +201,77 @@
         el.style.display = 'block';
         setTimeout(() => el.style.display = 'none', 4500);
     }
+
+    // ---------- auth state ----------
+    const getToken = () => localStorage.getItem('token');
+    function getUser() {
+        try { return JSON.parse(localStorage.getItem('kitapUser') || 'null'); }
+        catch { return null; }
+    }
+    function isAdmin() {
+        const u = getUser();
+        return !!u && Array.isArray(u.roles) && u.roles.includes('ROLE_ADMIN');
+    }
+    function saveAuth(result, fallbackEmail) {
+        localStorage.setItem('token', result.token);
+        localStorage.setItem('kitapUser', JSON.stringify(
+            result.user || { email: fallbackEmail, username: fallbackEmail, roles: [] }
+        ));
+    }
+    function clearAuth() {
+        localStorage.removeItem('token');
+        localStorage.removeItem('kitapUser');
+    }
+    function renderAuth() {
+        const logged = !!getToken();
+        const u = getUser();
+        $('#authLink').textContent = logged
+            ? '👤 ' + (u?.username || u?.email || 'Account')
+            : 'Login / Register';
+        $('#logoutBtn').style.display = logged ? '' : 'none';
+        document.querySelectorAll('.admin-only').forEach(el =>
+            el.style.display = (logged && isAdmin()) ? '' : 'none'
+        );
+    }
+    function onAuthLink(event) {
+        if (getToken()) { event.preventDefault(); return false; }
+        return go(event, '/login');
+    }
+    function logout() {
+        clearAuth();
+        renderAuth();
+        updateCartCount();
+        history.pushState({}, '', '/');
+        route();
+        notify('Signed out.', true);
+    }
+
     async function api(path, options = {}) {
-        const response = await fetch(API + path, {
-            ...options,
-            headers: {'Content-Type':'application/json', ...(options.headers || {})}
-        });
+        const headers = {'Content-Type':'application/json', ...(options.headers || {})};
+        const token = getToken();
+        if (token) headers.Authorization = 'Bearer ' + token;
+
+        const response = await fetch(API + path, {...options, headers});
         const text = await response.text();
         let result;
         try { result = text ? JSON.parse(text) : null; } catch { result = text; }
-        if (!response.ok) throw new Error(typeof result === 'string' ? result : `Request failed (${response.status})`);
+
+        if (!response.ok) {
+            let message = (result && typeof result === 'object' && (result.error || result.message))
+                || (typeof result === 'string' && result && result.length < 200 ? result : '')
+                || `Request failed (${response.status})`;
+            if (response.status === 401 && token && !path.startsWith('/api/auth/')) {
+                clearAuth();
+                renderAuth();
+                message = 'Session expired. Please sign in again.';
+            }
+            const err = new Error(message);
+            err.status = response.status;
+            throw err;
+        }
         return result;
     }
+
     function go(event, path) {
         event.preventDefault();
         history.pushState({}, '', path);
@@ -244,14 +284,12 @@
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         const path = location.pathname;
 
-        if (path === '/login') {
+        if (path === '/login' || path === '/register') {
             $('#loginView').classList.add('active');
+            setAuthMode(path === '/register');
         } else if (path === '/cart') {
             $('#cartView').classList.add('active');
             loadCart();
-        } else if (path === '/admin') {
-            $('#adminView').classList.add('active');
-            loadAdmin();
         } else if (path === '/details') {
             $('#detailsView').classList.add('active');
             loadDetails(new URLSearchParams(location.search).get('id'));
@@ -261,6 +299,7 @@
         }
     }
 
+    // ---------- books ----------
     async function loadCategories() {
         try {
             const list = await api('/api/categories');
@@ -269,6 +308,7 @@
       ${esc(c.name)}</label>
     `).join('');
             document.querySelectorAll('.category-check').forEach(x => x.onchange = () => {
+                document.querySelectorAll('.category-check').forEach(o => { if (o !== x) o.checked = false; });
                 const selected = document.querySelector('.category-check:checked');
                 loadBooks(selected ? `/api/books/category/${selected.value}` : '/api/books');
             });
@@ -336,6 +376,7 @@
 
     async function searchBooks() {
         const keyword = $('#searchInput').value.trim();
+        if (location.pathname !== '/') { history.pushState({}, '', '/'); route(); }
         if (!keyword) return loadBooks();
         try { books = await api('/api/books/search?keyword=' + encodeURIComponent(keyword)); sortBooks(); }
         catch (e) { notify(e.message); }
@@ -358,49 +399,96 @@
         loadBooks();
     }
 
+    // ---------- cart ----------
+    // Себет id-сі әр пайдаланушыға бөлек сақталады (басқа аккаунттың себеті 403 бермес үшін)
+    const cartKey = () => 'kitapCart_' + (getUser()?.email || 'guest');
+    const qtyOf = x => Number(x.quantity ?? x.quanity ?? 0);
+    const priceOf = x => Number(x.price ?? x.bookPrice ?? x.book?.price ?? 0);
+    const titleOf = x => x.bookTitle ?? x.title ?? x.book?.title ?? 'Book';
+
+    async function createCart() {
+        const cart = await api('/api/cart', {method:'POST'});
+        localStorage.setItem(cartKey(), cart.id);
+        return cart.id;
+    }
+    async function getCartId() {
+        return localStorage.getItem(cartKey()) || await createCart();
+    }
+
+    function requireLogin() {
+        if (getToken()) return true;
+        notify('Please sign in first.');
+        history.pushState({}, '', '/login');
+        route();
+        return false;
+    }
+
     async function addToCart(bookId) {
+        if (!requireLogin()) return;
+
+        const addOnce = async () => {
+            const cartId = await getCartId();
+            await api(`/api/cart/${cartId}/add?bookId=${bookId}&quantity=1`, {method:'POST'});
+        };
+
         try {
-            let cartId = localStorage.getItem('kitapCart');
-            if (!cartId) {
-                const cart = await api('/api/cart', {method:'POST'});
-                cartId = cart.id;
-                localStorage.setItem('kitapCart', cartId);
+            try {
+                await addOnce();
+            } catch (e) {
+                // Ескі/басқа адамның себеті болса: жаңасын жасап, қайталаймыз
+                if (e.status === 403 || e.status === 404) {
+                    localStorage.removeItem(cartKey());
+                    await addOnce();
+                } else throw e;
             }
-            await api(`/api/cart/${cartId}/add?bookId=${bookId}&quanity=1`, {method:'POST'});
             await updateCartCount();
             notify('Book added to cart.', true);
-        } catch (e) {
-            if (/out of stock|sold out|not available/i.test(e.message)) notify('Sorry, this book is out of stock.');
-            else notify(e.message);
-        }
+        } catch (e) { notify(e.message); }
     }
 
     async function updateCartCount() {
-        const id = localStorage.getItem('kitapCart');
-        if (!id) { $('#cartCount').textContent = '0'; return; }
+        const id = localStorage.getItem(cartKey());
+        if (!getToken() || !id) { $('#cartCount').textContent = '0'; return; }
         try {
             const items = await api('/api/cart/' + id);
-            $('#cartCount').textContent = items.reduce((n,x) => n + Number(x.quanity || 0), 0);
+            $('#cartCount').textContent = items.reduce((n,x) => n + qtyOf(x), 0);
         } catch { $('#cartCount').textContent = '0'; }
     }
 
+    function emptyCart(message) {
+        $('#cartItems').innerHTML = `<p class="muted">${esc(message)}</p>`;
+        $('#cartTotal').textContent = '';
+        $('#buyButton').disabled = true;
+        $('#checkoutForm').style.display = 'none';
+    }
+
     async function loadCart() {
-        const id = localStorage.getItem('kitapCart');
-        if (!id) { $('#cartItems').innerHTML = '<p class="muted">Your basket is empty.</p>'; $('#cartTotal').textContent = ''; return; }
+        if (!getToken()) { emptyCart('Please sign in to see your basket.'); return; }
+        const id = localStorage.getItem(cartKey());
+        if (!id) { emptyCart('Your basket is empty.'); return; }
         try {
             const items = await api('/api/cart/' + id);
-            if (!items.length) { $('#cartItems').innerHTML = '<p class="muted">Your basket is empty.</p>'; $('#cartTotal').textContent = ''; return; }
+            if (!items.length) { emptyCart('Your basket is empty.'); return; }
             $('#cartItems').innerHTML = items.map(x => `
       <div class="cartrow">
-        <div><strong>${esc(x.bookTitle)}</strong><div class="muted">Quantity: ${Number(x.quanity || 0)}</div></div>
-        <strong>${money(Number(x.price || 0) * Number(x.quanity || 0))}</strong>
+        <div><strong>${esc(titleOf(x))}</strong><div class="muted">Quantity: ${qtyOf(x)}</div></div>
+        <strong>${money(priceOf(x) * qtyOf(x))}</strong>
       </div>`).join('');
-            const sum = items.reduce((n,x) => n + Number(x.price || 0) * Number(x.quanity || 0), 0);
+            const sum = items.reduce((n,x) => n + priceOf(x) * qtyOf(x), 0);
             $('#cartTotal').textContent = 'Total: ' + money(sum);
-        } catch (e) { $('#cartItems').textContent = e.message; }
+            $('#buyButton').disabled = false;
+        } catch (e) {
+            if (e.status === 403 || e.status === 404) {
+                localStorage.removeItem(cartKey());
+                emptyCart('Your basket is empty.');
+            } else {
+                $('#cartItems').textContent = e.message;
+            }
+        }
     }
+
     async function clearCart() {
-        const id = localStorage.getItem('kitapCart');
+        const id = localStorage.getItem(cartKey());
         if (!id) return;
         try {
             await api('/api/cart/' + id, {method:'DELETE'});
@@ -408,56 +496,38 @@
         } catch (e) { notify(e.message); }
     }
 
-    async function loadAdmin() {
-        try {
-            const list = await api('/api/admin/books');
-            $('#adminRows').innerHTML = list.map(b => `
-      <tr>
-        <td>${esc(b.id)}</td><td>${esc(b.title)}</td><td>${esc(b.author)}</td><td>${money(b.price)}</td>
-        <td>
-          <button class="btn secondary small" onclick="editBook(${Number(b.id)})">Edit</button>
-          <button class="btn danger small" onclick="deleteBook(${Number(b.id)})">Delete</button>
-        </td>
-      </tr>`).join('');
-        } catch (e) { $('#adminRows').innerHTML = `<tr><td colspan="5">${esc(e.message)}</td></tr>`; }
+    function showCheckout() {
+        $('#checkoutForm').style.display = 'block';
+        if (!$('#customerName').value) {
+            $('#customerName').value = getUser()?.username || '';
+        }
+        $('#customerName').focus();
     }
-    async function editBook(id) {
-        try {
-            const b = await api('/api/books/' + id);
-            $('#bookId').value = b.id; $('#bookTitle').value = b.title || '';
-            $('#bookAuthor').value = b.author || ''; $('#bookPrice').value = b.price ?? '';
-            $('#bookCategory').value = b.categoryName || ''; $('#bookImage').value = b.imageUrl || '';
-            $('#bookDescription').value = b.description || '';
-            window.scrollTo({top:0,behavior:'smooth'});
-        } catch (e) { notify(e.message); }
-    }
-    async function deleteBook(id) {
-        if (!confirm('Delete this book?')) return;
-        try { await api('/api/admin/books/' + id,{method:'DELETE'}); await loadAdmin(); notify('Book deleted.',true); }
-        catch (e) { notify(e.message); }
-    }
-    function resetForm() { $('#bookForm').reset(); $('#bookId').value = ''; }
 
-    $('#bookForm').onsubmit = async e => {
+    $('#checkoutForm').onsubmit = async e => {
         e.preventDefault();
-        const id = $('#bookId').value;
-        const dto = {
-            title: $('#bookTitle').value.trim(),
-            author: $('#bookAuthor').value.trim(),
-            price: Number($('#bookPrice').value),
-            categoryName: $('#bookCategory').value.trim(),
-            imageUrl: $('#bookImage').value.trim(),
-            description: $('#bookDescription').value.trim()
-        };
+        if (!requireLogin()) return;
+        const cartId = localStorage.getItem(cartKey());
+        if (!cartId) { notify('Your basket is empty.'); return; }
+
         try {
-            await api('/api/admin/books' + (id ? '/' + id : ''), {
-                method: id ? 'PUT' : 'POST',
-                body: JSON.stringify(dto)
+            const order = await api('/api/orders', {
+                method: 'POST',
+                body: JSON.stringify({
+                    cartId: Number(cartId),
+                    customerName: $('#customerName').value.trim(),
+                    address: $('#customerAddress').value.trim()
+                })
             });
-            resetForm(); await loadAdmin(); notify(id ? 'Book updated.' : 'Book added.',true);
-        } catch (error) { notify(error.message); }
+            $('#checkoutForm').reset();
+            $('#checkoutForm').style.display = 'none';
+            await loadCart();
+            await updateCartCount();
+            notify(`Order placed${order && order.id ? ' #' + order.id : ''}. Thank you!`, true);
+        } catch (err) { notify(err.message); }
     };
 
+    // ---------- login / register ----------
     function setAuthMode(register) {
         registerMode = register;
         $('#usernameLabel').style.display = register ? 'block' : 'none';
@@ -466,22 +536,44 @@
         $('#authSubtitle').textContent = register ? 'Register to explore the bookstore.' : 'Sign in to your account.';
         $('#authSubmit').textContent = register ? 'Register' : 'Sign in';
     }
+
+    async function loginRequest(email, password) {
+        const result = await api('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({email, password})
+        });
+        saveAuth(result, email);
+    }
+
     $('#authForm').onsubmit = async e => {
         e.preventDefault();
-        const payload = registerMode
-            ? {userName:$('#usernameInput').value.trim(),email:$('#emailInput').value.trim(),password:$('#passwordInput').value}
-            : {email:$('#emailInput').value.trim(),password:$('#passwordInput').value};
+        const email = $('#emailInput').value.trim();
+        const password = $('#passwordInput').value;
         try {
-            const result = await api(registerMode ? '/api/auth/register' : '/api/auth/login',{
-                method:'POST',body:JSON.stringify(payload)
-            });
-            localStorage.setItem('kitapUser',JSON.stringify(result));
-            history.pushState({},'', '/');
+            if (registerMode) {
+                await api('/api/auth/register', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        userName: $('#usernameInput').value.trim(),
+                        email,
+                        password
+                    })
+                });
+            }
+            // Тіркелгеннен кейін де автоматты түрде кіреміз
+            await loginRequest(email, password);
+            $('#authForm').reset();
+            renderAuth();
+            await updateCartCount();
+            history.pushState({}, '', '/');
             route();
-            notify(registerMode ? 'Account created.' : 'Signed in.',true);
+            notify(registerMode ? 'Account created.' : 'Signed in.', true);
         } catch (error) { notify(error.message); }
     };
 
+    // ---------- start ----------
+    localStorage.removeItem('kitapCart'); // ескі ортақ кілт
+    renderAuth();
     loadCategories();
     updateCartCount();
     route();

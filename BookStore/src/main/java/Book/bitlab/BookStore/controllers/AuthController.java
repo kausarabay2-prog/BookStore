@@ -1,5 +1,6 @@
 package Book.bitlab.BookStore.controllers;
 
+import Book.bitlab.BookStore.AuthResponse;
 import Book.bitlab.BookStore.Entity.User;
 import Book.bitlab.BookStore.dto.LoginDto;
 import Book.bitlab.BookStore.dto.RegestrationDTO;
@@ -13,36 +14,36 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
+
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegestrationDTO dto) {
-        try {
-            User user = authService.register(dto);
-            return ResponseEntity.ok(toResponse(user));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
-    }
+    public ResponseEntity<UserResponseDTO> register(
+            @RequestBody RegestrationDTO dto) {
 
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginDto dto) {
-        try {
-            User user = authService.login(dto.getEmail(), dto.getPassword());
-            return ResponseEntity.ok(toResponse(user));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
-    }
+        User user = authService.register(dto);
 
-    private UserResponseDTO toResponse(User user) {
-        return UserResponseDTO.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .roles(user.getRoles().stream()
+        UserResponseDTO response = new UserResponseDTO();
+        response.setId(user.getId());
+        response.setUsername(user.getUsername());
+        response.setEmail(user.getEmail());
+        response.setRoles(
+                user.getRoles()
+                        .stream()
                         .map(role -> role.getName())
-                        .toList())
-                .build();
+                        .toList()
+        );
+
+        return ResponseEntity.ok(response);
     }
+
+    // Жауап: { "token": "...", "user": { "username", "email", "roles" } }
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponse> login(
+            @RequestBody LoginDto dto) {
+
+        return ResponseEntity.ok(
+                authService.login(dto.getEmail(), dto.getPassword())
+        );
     }
+}

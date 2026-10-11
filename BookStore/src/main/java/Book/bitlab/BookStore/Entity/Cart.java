@@ -1,3 +1,4 @@
+
 package Book.bitlab.BookStore.Entity;
 
 import Book.bitlab.BookStore.Item.CartItem;
@@ -20,6 +21,10 @@ public class Cart {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
     @OneToMany(
             mappedBy = "cart",
             cascade = CascadeType.ALL,
@@ -27,4 +32,14 @@ public class Cart {
     )
     @Builder.Default
     private List<CartItem> items = new ArrayList<>();
+
+    public void addItem(CartItem item) {
+        items.add(item);
+        item.setCart(this);
+    }
+
+    public void removeItem(CartItem item) {
+        items.remove(item);
+        item.setCart(null);
+    }
 }
