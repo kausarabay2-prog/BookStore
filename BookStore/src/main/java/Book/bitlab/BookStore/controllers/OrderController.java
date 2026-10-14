@@ -25,6 +25,12 @@ public class OrderController {
         return ResponseEntity.ok(orderService.create(dto, authentication.getName()));
     }
 
+    // Кірген пайдаланушының өз тапсырыстары
+    @GetMapping("/my")
+    public ResponseEntity<List<OrderDTO>> getMine(Authentication authentication) {
+        return ResponseEntity.ok(orderService.getMine(authentication.getName()));
+    }
+
     // ADMIN
     @GetMapping
     public ResponseEntity<List<OrderDTO>> getAll() {

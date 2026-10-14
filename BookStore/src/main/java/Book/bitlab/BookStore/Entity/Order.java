@@ -4,6 +4,7 @@ import Book.bitlab.BookStore.Item.OrderItem;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -29,6 +30,13 @@ public class Order {
 
     @Column(name = "cart_id")
     private Long cartId;
+
+    // Тапсырыс иесі (ескі тапсырыстарда null болуы мүмкін)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
+    private LocalDateTime createdAt;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     private List<OrderItem> items;

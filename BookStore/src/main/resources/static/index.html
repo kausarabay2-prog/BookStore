@@ -38,7 +38,14 @@
         .price{color:var(--navy);font-weight:800;margin:10px 0}.actions{display:flex;gap:7px}.actions>*{flex:1;text-align:center}
         .notice{display:none;padding:12px;margin:12px 0;border-radius:8px;background:#fff0e7;color:#93482f}.notice.ok{background:#e7f5ed;color:#26714f}
         .cartrow{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:16px 0;border-bottom:1px solid var(--line)}.cartrow:last-child{border:0}.cartrow strong{white-space:nowrap}
+        .qty{display:flex;align-items:center;gap:7px}.qty span{min-width:24px;text-align:center;font-weight:700}
         .total{text-align:right;margin:20px 0;font-size:20px;font-weight:800}
+        .stock{font-size:12px;font-weight:700;margin:2px 0 8px;color:#26714f}.stock.low{color:#b26a00}
+        .oops{display:inline-block;font-size:12px;font-weight:800;padding:5px 9px;border-radius:7px;background:#fff0e7;color:#b8431f;margin:2px 0 8px}
+        .oopsbox{padding:12px 14px;margin:10px 0;border-radius:8px;background:#fff0e7;color:#93482f;font-size:13px;line-height:1.5}
+        .btn:disabled{opacity:.45;cursor:not-allowed}
+        .seller{font-size:11px;color:var(--muted)}.seller a{color:var(--purple);font-weight:700}
+        .shopbanner{margin-bottom:20px}.shopbanner p{line-height:1.6;color:#555b69}
         .table{width:100%;border-collapse:collapse}.table th,.table td{text-align:left;padding:12px 9px;border-bottom:1px solid var(--line);font-size:13px}.table th{color:var(--muted);font-size:11px}
         .formgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.formgrid input,.formgrid textarea,.auth input{width:100%;padding:11px;border:1px solid var(--line);border-radius:7px}.formgrid textarea{grid-column:1/-1;min-height:75px}
         .auth{max-width:440px;margin:35px auto}.auth h2{margin-top:0}.auth label{display:block;margin:14px 0;font-size:13px;font-weight:700}.auth input{display:block;margin-top:7px}.tabs{display:flex;gap:8px;margin:17px 0}
@@ -58,8 +65,10 @@
     </div>
     <nav class="nav">
         <a id="authLink" href="/login" onclick="return onAuthLink(event)">Login / Register</a>
+        <a class="user-only" href="/orders" onclick="return go(event,'/orders')" style="display:none">My orders</a>
+        <a class="seller-only" href="/open-shop" onclick="return go(event,'/open-shop')" style="display:none">🏬 My shop</a>
         <button id="logoutBtn" type="button" style="display:none" onclick="logout()">Logout</button>
-        <a class="admin-only" href="/admin" style="display:none">Admin</a>
+        <a class="seller-only" href="/admin" style="display:none">My books</a>
         <a class="cartlink" href="/cart" onclick="return go(event,'/cart')">Cart 🛒 <span id="cartCount">0</span></a>
     </nav>
 </header>
@@ -68,14 +77,18 @@
     <a href="/" onclick="return go(event,'/')">Home</a>
     <a href="/#catalog" onclick="return go(event,'/')">Books</a>
     <a href="/cart" onclick="return go(event,'/cart')">Shopping cart</a>
-    <a class="admin-only" href="/admin" style="display:none">Books Admin</a>
+    <a class="user-only" href="/orders" onclick="return go(event,'/orders')" style="display:none">My orders</a>
+    <a class="seller-only" href="/admin" style="display:none">Manage books</a>
+    <a class="admin-only" href="/admin/orders" style="display:none">Orders Admin</a>
+    <a class="admin-only" href="/admin/users" style="display:none">Users</a>
 </div>
 
 <main class="container">
     <section id="notice" class="notice"></section>
 
     <section id="storeView" class="view">
-        <div class="hero">
+        <div id="shopBanner" class="panel shopbanner" style="display:none"></div>
+        <div class="hero" id="hero">
             <div>
                 <small>WELCOME TO BOOKSTORE</small>
                 <h1>Find a book.<br>Find a new world.</h1>
@@ -176,6 +189,36 @@
         </form>
     </section>
 
+    <section id="openShopView" class="view panel auth">
+        <h2>Open your bookstore</h2>
+        <p class="muted">Staff members can run their own shop. Give it a name, then add your books, set prices and manage your stock.</p>
+        <form id="openShopForm">
+            <label>Shop name
+                <input id="shopName" maxlength="60" required>
+            </label>
+            <label>Short description (optional)
+                <textarea id="shopDescription" maxlength="500" style="width:100%;min-height:90px;padding:11px;border:1px solid var(--line);border-radius:7px;margin-top:7px"></textarea>
+            </label>
+            <button class="btn" type="submit">Open my shop</button>
+        </form>
+    </section>
+
+    <section id="ordersView" class="view panel">
+        <div class="headrow">
+            <div>
+                <h2>My orders</h2>
+                <p class="muted">Your order history.</p>
+            </div>
+            <a class="btn secondary" href="/" onclick="return go(event,'/')">Continue shopping</a>
+        </div>
+        <div style="overflow-x:auto">
+            <table class="table">
+                <thead><tr><th>Order</th><th>Date</th><th>Address</th><th>Total</th><th>Status</th></tr></thead>
+                <tbody id="orderRows"></tbody>
+            </table>
+        </div>
+    </section>
+
     <footer>© 2025 BookStore · Find your next great read.</footer>
 </main>
 
@@ -208,9 +251,21 @@
         try { return JSON.parse(localStorage.getItem('kitapUser') || 'null'); }
         catch { return null; }
     }
-    function isAdmin() {
+    function hasRole(role) {
         const u = getUser();
-        return !!u && Array.isArray(u.roles) && u.roles.includes('ROLE_ADMIN');
+        return !!u && Array.isArray(u.roles) && u.roles.includes(role);
+    }
+    function isAdmin() { return hasRole('ROLE_ADMIN'); }
+    function isSeller() { return hasRole('ROLE_SELLER') || hasRole('ROLE_ADMIN'); }
+
+    // Рөлдер өзгерсе (мысалы админ сатушы етсе), қайта кірмей-ақ жаңарады
+    async function refreshMe() {
+        if (!getToken()) return;
+        try {
+            const me = await api('/api/me');
+            localStorage.setItem('kitapUser', JSON.stringify(me));
+            renderAuth();
+        } catch { /* 401 болса api() өзі токенді тазалайды */ }
     }
     function saveAuth(result, fallbackEmail) {
         localStorage.setItem('token', result.token);
@@ -229,6 +284,12 @@
             ? '👤 ' + (u?.username || u?.email || 'Account')
             : 'Login / Register';
         $('#logoutBtn').style.display = logged ? '' : 'none';
+        document.querySelectorAll('.user-only').forEach(el =>
+            el.style.display = logged ? '' : 'none'
+        );
+        document.querySelectorAll('.seller-only').forEach(el =>
+            el.style.display = (logged && isSeller()) ? '' : 'none'
+        );
         document.querySelectorAll('.admin-only').forEach(el =>
             el.style.display = (logged && isAdmin()) ? '' : 'none'
         );
@@ -287,14 +348,23 @@
         if (path === '/login' || path === '/register') {
             $('#loginView').classList.add('active');
             setAuthMode(path === '/register');
+        } else if (path === '/open-shop') {
+            showOpenShop();
+        } else if (path === '/shop') {
+            $('#storeView').classList.add('active');
+            loadShopView(new URLSearchParams(location.search).get('id'));
         } else if (path === '/cart') {
             $('#cartView').classList.add('active');
             loadCart();
+        } else if (path === '/orders') {
+            $('#ordersView').classList.add('active');
+            loadOrders();
         } else if (path === '/details') {
             $('#detailsView').classList.add('active');
             loadDetails(new URLSearchParams(location.search).get('id'));
         } else {
             $('#storeView').classList.add('active');
+            showStoreChrome(false);
             loadBooks();
         }
     }
@@ -325,6 +395,16 @@
         }
     }
 
+    const stockOf = b => Number(b.stock || 0);
+
+    // Қойма күйі: бітсе "Oops!", аз қалса ескерту
+    function stockHtml(b) {
+        const s = stockOf(b);
+        if (s <= 0) return '<div class="oops">Oops! Out of stock</div>';
+        if (s <= 5) return `<div class="stock low">Only ${s} left</div>`;
+        return `<div class="stock">In stock: ${s}</div>`;
+    }
+
     function sortBooks() {
         const list = [...books];
         if ($('#sort').value === 'title') list.sort((a,b) => (a.title||'').localeCompare(b.title||''));
@@ -342,8 +422,10 @@
         <div class="author">by ${esc(b.author || 'Unknown author')}</div>
         <div class="desc">${esc(b.description || 'No description available.')}</div>
         <div class="price">${money(b.price)}</div>
+        ${stockHtml(b)}
+        ${shopLabel(b) ? `<div class="seller">Seller: ${shopLabel(b)}</div>` : ''}
         <div class="actions">
-          <button class="btn small" onclick="addToCart(${Number(b.id)})">Add to cart</button>
+          <button class="btn small" ${stockOf(b) <= 0 ? 'disabled' : ''} onclick="addToCart(${Number(b.id)})">${stockOf(b) <= 0 ? 'Sold out' : 'Add to cart'}</button>
           <button class="btn secondary small" onclick="goDetails(${Number(b.id)})">Details</button>
         </div>
       </div>
@@ -367,8 +449,12 @@
           <h1>${esc(b.title)}</h1>
           <p class="muted">by ${esc(b.author || 'Unknown author')}</p>
           <h2>${money(b.price)}</h2>
+          ${stockHtml(b)}
+          ${shopLabel(b) ? `<p class="seller">Seller: ${shopLabel(b)}</p>` : ''}
           <p style="line-height:1.7">${esc(b.description || 'No description available.')}</p>
-          <button class="btn" onclick="addToCart(${Number(b.id)})">Add to cart</button>
+          ${stockOf(b) <= 0
+                ? '<div class="oopsbox">Oops! This book is out of stock right now. Please check back later.</div>'
+                : `<button class="btn" onclick="addToCart(${Number(b.id)})">Add to cart</button>`}
         </div>
       </div>`;
         } catch (e) { $('#detailsContent').textContent = e.message; }
@@ -400,11 +486,8 @@
     }
 
     // ---------- cart ----------
-    // Себет id-сі әр пайдаланушыға бөлек сақталады (басқа аккаунттың себеті 403 бермес үшін)
+    // Себет id-сі әр пайдаланушыға бөлек сақталады
     const cartKey = () => 'kitapCart_' + (getUser()?.email || 'guest');
-    const qtyOf = x => Number(x.quantity ?? x.quanity ?? 0);
-    const priceOf = x => Number(x.price ?? x.bookPrice ?? x.book?.price ?? 0);
-    const titleOf = x => x.bookTitle ?? x.title ?? x.book?.title ?? 'Book';
 
     async function createCart() {
         const cart = await api('/api/cart', {method:'POST'});
@@ -446,12 +529,14 @@
         } catch (e) { notify(e.message); }
     }
 
+    const totalQty = lines => lines.reduce((n, x) => n + Number(x.quantity || 0), 0);
+
     async function updateCartCount() {
         const id = localStorage.getItem(cartKey());
         if (!getToken() || !id) { $('#cartCount').textContent = '0'; return; }
         try {
-            const items = await api('/api/cart/' + id);
-            $('#cartCount').textContent = items.reduce((n,x) => n + qtyOf(x), 0);
+            const lines = await api('/api/cart/' + id);
+            $('#cartCount').textContent = totalQty(lines);
         } catch { $('#cartCount').textContent = '0'; }
     }
 
@@ -462,21 +547,44 @@
         $('#checkoutForm').style.display = 'none';
     }
 
+    function renderCart(lines) {
+        if (!lines.length) { emptyCart('Your basket is empty.'); return; }
+
+        // Қойма жетпейтін жолдар (кітап біткен немесе саны азайған)
+        const problem = x => Number(x.quantity || 0) > Number(x.stock || 0);
+
+        $('#cartItems').innerHTML = lines.map(x => `
+      <div class="cartrow">
+        <div>
+          <strong>${esc(x.bookTitle || 'Book')}</strong>
+          <div class="muted">${money(x.price)} each</div>
+          ${Number(x.stock || 0) <= 0
+            ? '<div class="oops">Oops! Out of stock, please remove it</div>'
+            : problem(x) ? `<div class="oops">Oops! Only ${Number(x.stock)} left, please reduce the quantity</div>` : ''}
+        </div>
+        <div class="qty">
+          <button class="btn secondary small" onclick="changeQty(${Number(x.bookId)}, ${Number(x.quantity) - 1})">−</button>
+          <span>${Number(x.quantity || 0)}</span>
+          <button class="btn secondary small" ${Number(x.quantity || 0) >= Number(x.stock || 0) ? 'disabled' : ''} onclick="changeQty(${Number(x.bookId)}, ${Number(x.quantity) + 1})">+</button>
+          <button class="btn danger small" onclick="removeItem(${Number(x.bookId)})">Remove</button>
+        </div>
+        <strong>${money(Number(x.price || 0) * Number(x.quantity || 0))}</strong>
+      </div>`).join('');
+
+        const sum = lines.reduce((n, x) => n + Number(x.price || 0) * Number(x.quantity || 0), 0);
+        $('#cartTotal').textContent = 'Total: ' + money(sum);
+
+        // Қойма жетпесе, сатып алуға болмайды
+        $('#buyButton').disabled = lines.some(problem);
+        if (lines.some(problem)) $('#checkoutForm').style.display = 'none';
+    }
+
     async function loadCart() {
         if (!getToken()) { emptyCart('Please sign in to see your basket.'); return; }
         const id = localStorage.getItem(cartKey());
         if (!id) { emptyCart('Your basket is empty.'); return; }
         try {
-            const items = await api('/api/cart/' + id);
-            if (!items.length) { emptyCart('Your basket is empty.'); return; }
-            $('#cartItems').innerHTML = items.map(x => `
-      <div class="cartrow">
-        <div><strong>${esc(titleOf(x))}</strong><div class="muted">Quantity: ${qtyOf(x)}</div></div>
-        <strong>${money(priceOf(x) * qtyOf(x))}</strong>
-      </div>`).join('');
-            const sum = items.reduce((n,x) => n + priceOf(x) * qtyOf(x), 0);
-            $('#cartTotal').textContent = 'Total: ' + money(sum);
-            $('#buyButton').disabled = false;
+            renderCart(await api('/api/cart/' + id));
         } catch (e) {
             if (e.status === 403 || e.status === 404) {
                 localStorage.removeItem(cartKey());
@@ -485,6 +593,26 @@
                 $('#cartItems').textContent = e.message;
             }
         }
+    }
+
+    async function changeQty(bookId, quantity) {
+        const id = localStorage.getItem(cartKey());
+        if (!id) return;
+        try {
+            const lines = await api(`/api/cart/${id}/items/${bookId}?quantity=${Math.max(0, quantity)}`, {method:'PUT'});
+            renderCart(lines);
+            $('#cartCount').textContent = totalQty(lines);
+        } catch (e) { notify(e.message); }
+    }
+
+    async function removeItem(bookId) {
+        const id = localStorage.getItem(cartKey());
+        if (!id) return;
+        try {
+            const lines = await api(`/api/cart/${id}/items/${bookId}`, {method:'DELETE'});
+            renderCart(lines);
+            $('#cartCount').textContent = totalQty(lines);
+        } catch (e) { notify(e.message); }
     }
 
     async function clearCart() {
@@ -521,9 +649,119 @@
             });
             $('#checkoutForm').reset();
             $('#checkoutForm').style.display = 'none';
-            await loadCart();
             await updateCartCount();
+            history.pushState({}, '', '/orders');
+            route();
             notify(`Order placed${order && order.id ? ' #' + order.id : ''}. Thank you!`, true);
+        } catch (err) { notify(err.message); }
+    };
+
+    // ---------- my orders ----------
+    function fmtDate(v) {
+        if (!v) return '—';
+        const d = new Date(v);
+        return isNaN(d) ? '—' : d.toLocaleString();
+    }
+
+    async function loadOrders() {
+        if (!getToken()) {
+            $('#orderRows').innerHTML = '<tr><td colspan="5">Please sign in to see your orders.</td></tr>';
+            return;
+        }
+        try {
+            const orders = await api('/api/orders/my');
+            $('#orderRows').innerHTML = orders.length ? orders.map(o => `
+      <tr>
+        <td>#${esc(o.id)}</td>
+        <td>${esc(fmtDate(o.createdAt))}</td>
+        <td>${esc(o.address)}</td>
+        <td>${money(o.totalPrice)}</td>
+        <td>${esc(o.status)}</td>
+      </tr>`).join('') : '<tr><td colspan="5">You have no orders yet.</td></tr>';
+        } catch (e) {
+            $('#orderRows').innerHTML = `<tr><td colspan="5">${esc(e.message)}</td></tr>`;
+        }
+    }
+
+    // ---------- shops ----------
+    // Дүкен аты (дүкенге сілтеме) немесе дүкені жоқ иенің аты
+    function shopLabel(b) {
+        if (b.shopId) {
+            const id = Number(b.shopId);
+            return `<a href="/shop?id=${id}" onclick="return go(event,'/shop?id=${id}')">🏬 ${esc(b.shopName || 'Shop')}</a>`;
+        }
+        return b.ownerName ? esc(b.ownerName) : '';
+    }
+
+    // Дүкен бетінде hero жасырылып, дүкен тақырыбы көрсетіледі
+    function showStoreChrome(isShop) {
+        $('#hero').style.display = isShop ? 'none' : '';
+        $('#shopBanner').style.display = isShop ? '' : 'none';
+    }
+
+    async function loadShopView(id) {
+        showStoreChrome(true);
+        if (!id) {
+            $('#shopBanner').innerHTML = '<h2>Shop not found</h2>';
+            books = []; sortBooks();
+            return;
+        }
+        try {
+            const shop = await api('/api/shops/' + encodeURIComponent(id));
+            $('#shopBanner').innerHTML = `
+        <div class="muted">SHOP</div>
+        <h2 style="margin:4px 0 8px">🏬 ${esc(shop.name)}</h2>
+        ${shop.description ? `<p>${esc(shop.description)}</p>` : ''}
+        <div class="seller">Owner: ${esc(shop.ownerName || '')}</div>`;
+            await loadBooks('/api/books/shop/' + encodeURIComponent(id));
+        } catch (e) {
+            $('#shopBanner').innerHTML = `<h2>${esc(e.message)}</h2>`;
+            books = []; sortBooks();
+        }
+    }
+
+    // «My shop» беті: кірмеген болса, логинге; қызметкер емес болса, басты бетке;
+    // дүкені бар болса, басқару бетіне
+    async function showOpenShop() {
+        if (!getToken()) {
+            notify('Please sign in first.');
+            history.replaceState({}, '', '/login');
+            route();
+            return;
+        }
+        await refreshMe();   // рөлдердің ең жаңа күйі
+        if (!isSeller()) {
+            notify('Only staff members can open a shop. Ask an admin to give you the seller role.');
+            history.replaceState({}, '', '/');
+            route();
+            return;
+        }
+        try {
+            await api('/api/shops/mine');
+            location.href = '/admin';
+            return;
+        } catch (e) {
+            if (e.status === 401) {
+                history.replaceState({}, '', '/login');
+                route();
+                return;
+            }
+            if (e.status !== 404) { notify(e.message); }
+        }
+        $('#openShopView').classList.add('active');
+    }
+
+    $('#openShopForm').onsubmit = async e => {
+        e.preventDefault();
+        try {
+            await api('/api/shops', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: $('#shopName').value.trim(),
+                    description: $('#shopDescription').value.trim()
+                })
+            });
+            location.href = '/admin';
         } catch (err) { notify(err.message); }
     };
 
@@ -574,6 +812,7 @@
     // ---------- start ----------
     localStorage.removeItem('kitapCart'); // ескі ортақ кілт
     renderAuth();
+    refreshMe();
     loadCategories();
     updateCartCount();
     route();

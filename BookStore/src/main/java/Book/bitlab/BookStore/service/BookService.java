@@ -2,10 +2,14 @@ package Book.bitlab.BookStore.service;
 
 import Book.bitlab.BookStore.Entity.Book;
 import Book.bitlab.BookStore.Entity.Category;
+import Book.bitlab.BookStore.Entity.User;
 import Book.bitlab.BookStore.Mapper.BookMapper;
 import Book.bitlab.BookStore.dto.BookDTO;
 import Book.bitlab.BookStore.repositories.BookRepository;
 import Book.bitlab.BookStore.repositories.CategoryRepository;
+import Book.bitlab.BookStore.repositories.ShopRepository;
+import Book.bitlab.BookStore.repositories.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,22 +18,18 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 @Transactional
 public class BookService {
 
+    private static final int MAX_STOCK = 1_000_000;
+    private static final int MAX_RESTOCK = 100_000;
+
     private final BookRepository bookRepository;
     private final CategoryRepository categoryRepository;
+    private final UserRepository userRepository;
+    private final ShopRepository shopRepository;
     private final BookMapper bookMapper;
-
-    public BookService(
-            BookRepository bookRepository,
-            CategoryRepository categoryRepository,
-            BookMapper bookMapper
-    ) {
-        this.bookRepository = bookRepository;
-        this.categoryRepository = categoryRepository;
-        this.bookMapper = bookMapper;
-    }
 
     private ResponseStatusException bad(String msg) {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, msg);
@@ -41,9 +41,42 @@ public class BookService {
                         HttpStatus.NOT_FOUND, "Book not found: " + id));
     }
 
+    // ADMIN: кез келген кітап. SELLER: тек өз кітабы.
+    private void assertCanManage(Book book, String email, boolean admin) {
+        if (admin) return;
+
+        User owner = book.getOwner();
+        if (owner == null || owner.getEmail() == null || !owner.getEmail().equalsIgnoreCase(email)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "You can manage only your own books");
+        }
+    }
+
+    private int validStock(Integer value) {
+        if (value == null) return 0;
+        if (value < 0 || value > MAX_STOCK) {
+            throw bad("Stock must be between 0 and " + MAX_STOCK);
+        }
+        return value;
+    }
+
     @Transactional(readOnly = true)
     public List<BookDTO> getAll() {
         return bookRepository.findAll().stream().map(bookMapper::toDto).toList();
+    }
+
+    // Сатушының өз кітаптары
+    @Transactional(readOnly = true)
+    public List<BookDTO> getMine(String email) {
+        return bookRepository.findByOwner_EmailOrderByIdDesc(email)
+                .stream().map(bookMapper::toDto).toList();
+    }
+
+    // Бір дүкеннің кітаптары
+    @Transactional(readOnly = true)
+    public List<BookDTO> getByShop(Long shopId) {
+        return bookRepository.findByShop_IdOrderByIdDesc(shopId)
+                .stream().map(bookMapper::toDto).toList();
     }
 
     @Transactional(readOnly = true)
@@ -81,8 +114,12 @@ public class BookService {
         }
     }
 
-    public BookDTO create(BookDTO dto) {
+    public BookDTO create(BookDTO dto, String email) {
         validate(dto);
+
+        User owner = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "User not found"));
 
         Book book = Book.builder()
                 .title(dto.getTitle().trim())
@@ -90,14 +127,19 @@ public class BookService {
                 .price(dto.getPrice())
                 .description(dto.getDescription())
                 .imageURL(dto.getImageUrl())
+                .stock(validStock(dto.getStock()))
                 .category(getCategory(dto))
+                .owner(owner)
+                // Иесінің дүкені болса, кітап сол дүкенде көрінеді
+                .shop(shopRepository.findByOwner_Email(email).orElse(null))
                 .build();
 
         return bookMapper.toDto(bookRepository.save(book));
     }
 
-    public BookDTO update(Long id, BookDTO dto) {
+    public BookDTO update(Long id, BookDTO dto, String email, boolean admin) {
         Book book = find(id);
+        assertCanManage(book, email, admin);
         validate(dto);
 
         // Категория келмесе, ескісі сақталады
@@ -115,20 +157,45 @@ public class BookService {
             book.setImageURL(dto.getImageUrl());
         }
 
+        // Саны жіберілмесе, бұрынғысы сақталады
+        if (dto.getStock() != null) {
+            book.setStock(validStock(dto.getStock()));
+        }
+
         return bookMapper.toDto(bookRepository.save(book));
     }
 
-    public void delete(Long id) {
-        if (!bookRepository.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Book not found: " + id);
+    // Қоймаға дана қосу (біткен кітапты толтыру)
+    public BookDTO restock(Long id, Integer amount, String email, boolean admin) {
+        if (amount == null || amount < 1 || amount > MAX_RESTOCK) {
+            throw bad("Amount must be between 1 and " + MAX_RESTOCK);
         }
-        bookRepository.deleteById(id);
+
+        Book book = find(id);
+        assertCanManage(book, email, admin);
+
+        int current = book.getStock() == null ? 0 : book.getStock();
+        book.setStock(current + amount);
+
+        return bookMapper.toDto(bookRepository.save(book));
     }
 
+    public void delete(Long id, String email, boolean admin) {
+        Book book = find(id);
+        assertCanManage(book, email, admin);
+        bookRepository.delete(book);
+    }
+
+    // Атауы НЕМЕСЕ авторы бойынша іздеу
     @Transactional(readOnly = true)
     public List<BookDTO> search(String keyword) {
-        return bookRepository.findByTitleContainingIgnoreCase(keyword == null ? "" : keyword)
-                .stream().map(bookMapper::toDto).toList();
+        String k = keyword == null ? "" : keyword.trim();
+
+        return bookRepository
+                .findByTitleContainingIgnoreCaseOrAuthorContainingIgnoreCase(k, k)
+                .stream()
+                .map(bookMapper::toDto)
+                .toList();
     }
 
     @Transactional(readOnly = true)

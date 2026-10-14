@@ -17,4 +17,14 @@ public class BookDTO {
     private Long categoryId;
     private String categoryName;
 
+    // Қоймадағы саны
+    private Integer stock;
+
+    // Кітапты қосқан адам (тек оқуға: сұраныстан алынбайды)
+    private String ownerName;
+    private String ownerEmail;
+
+    // Дүкен (тек оқуға)
+    private Long shopId;
+    private String shopName;
 }

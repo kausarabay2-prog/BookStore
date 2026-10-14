@@ -1,4 +1,4 @@
-package Book.bitlab.BookStore;
+package Book.bitlab.BookStore.dto;
 
 import java.util.List;
 

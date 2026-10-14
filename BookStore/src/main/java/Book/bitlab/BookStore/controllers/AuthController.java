@@ -1,6 +1,6 @@
 package Book.bitlab.BookStore.controllers;
 
-import Book.bitlab.BookStore.AuthResponse;
+import Book.bitlab.BookStore.dto.AuthResponse;
 import Book.bitlab.BookStore.Entity.User;
 import Book.bitlab.BookStore.dto.LoginDto;
 import Book.bitlab.BookStore.dto.RegestrationDTO;
@@ -43,6 +43,7 @@ public class AuthController {
             @RequestBody LoginDto dto) {
 
         return ResponseEntity.ok(
+
                 authService.login(dto.getEmail(), dto.getPassword())
         );
     }

@@ -41,6 +41,7 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) {
 
         Role userRole = ensureRole("ROLE_USER");
+        ensureRole("ROLE_SELLER");
         Role adminRole = ensureRole("ROLE_ADMIN");
 
         if (adminEmail == null || adminEmail.isBlank()) {

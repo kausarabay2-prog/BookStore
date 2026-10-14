@@ -1,9 +1,9 @@
 package Book.bitlab.BookStore.service;
 
-import Book.bitlab.BookStore.AuthResponse;
+import Book.bitlab.BookStore.dto.AuthResponse;
 import Book.bitlab.BookStore.Entity.User;
 import Book.bitlab.BookStore.Security.JwtService;
-import Book.bitlab.BookStore.UserInfoResponse;
+import Book.bitlab.BookStore.dto.UserInfoResponse;
 import Book.bitlab.BookStore.dto.RegestrationDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -22,7 +22,7 @@ public class AuthService {
         return userService.register(dto);
     }
 
-    // Токенмен бірге пайдаланушы аты мен рөлдерін де қайтарады
+    // Токенмен бірге пайдаланушы аты мен рөлдерін де қайтарамыз
     public AuthResponse login(String email, String password) {
 
         User user = userService.login(email, password);

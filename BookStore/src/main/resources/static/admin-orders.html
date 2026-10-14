@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Orders Admin | BookStore</title>
+    <style>
+        *{box-sizing:border-box}body{margin:0;background:#f5f6fa;color:#252a34;font-family:Arial,sans-serif}
+        header{height:65px;background:#292f3b;color:white}
+        .wrap{width:min(1120px,94%);margin:auto}.head{height:100%;display:flex;align-items:center;justify-content:space-between}
+        header a{color:white;text-decoration:none;font-weight:bold}.brand{font-size:20px}
+        main{padding:28px 0}
+        .panel{padding:20px;background:white;border:1px solid #e6e8ed;border-radius:9px}
+        h1{margin:0 0 18px;font-size:28px}
+        button{border:0;border-radius:6px;padding:10px 13px;cursor:pointer;font-weight:bold}
+        .blue{background:#4285dc;color:white}
+        table{width:100%;border-collapse:collapse;margin-top:15px}
+        th,td{padding:12px 9px;border-bottom:1px solid #eceef2;text-align:left;font-size:14px}
+        th{color:#747c88;font-size:12px}
+        select{padding:8px;border:1px solid #dfe2e8;border-radius:6px}
+        .notice{display:none;margin:12px 0;padding:11px;border-radius:6px;background:#fff0e7;color:#93482f}
+        .notice.ok{background:#e7f5ed;color:#26714f}
+        .table-wrap{overflow-x:auto}
+    </style>
+</head>
+<body>
+<header>
+    <div class="wrap head">
+        <a class="brand" href="/">📚 BookStore Admin</a>
+        <div>
+            <span id="adminName" style="margin-right:18px"></span>
+            <a href="/admin" style="margin-right:18px">Books</a>
+            <a href="/">Store</a>
+        </div>
+    </div>
+</header>
+
+<main class="wrap">
+    <div id="notice" class="notice"></div>
+    <section class="panel">
+        <h1>Orders Admin</h1>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Order</th><th>Date</th><th>Customer</th><th>Account</th>
+                    <th>Address</th><th>Total</th><th>Status</th><th></th>
+                </tr>
+                </thead>
+                <tbody id="orderRows"></tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+<script>
+    const API = '';
+    const $ = s => document.querySelector(s);
+    const STATUSES = ['NEW', 'PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED'];
+
+    const getToken = () => localStorage.getItem('token');
+    function getUser() {
+        try { return JSON.parse(localStorage.getItem('kitapUser') || 'null'); }
+        catch { return null; }
+    }
+
+    if (!getToken()) {
+        location.href = '/login';
+    }
+    const currentUser = getUser();
+    $('#adminName').textContent = '👤 ' + (currentUser?.username || currentUser?.email || '');
+
+    function esc(v) {
+        return String(v ?? '').replace(/[&<>"']/g, c =>
+            ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
+        );
+    }
+    function money(v) {
+        return new Intl.NumberFormat('en-US').format(Number(v) || 0) + ' ₸';
+    }
+    function fmtDate(v) {
+        if (!v) return '—';
+        const d = new Date(v);
+        return isNaN(d) ? '—' : d.toLocaleString();
+    }
+    function notice(text, ok = false) {
+        const el = $('#notice');
+        el.textContent = text;
+        el.className = ok ? 'notice ok' : 'notice';
+        el.style.display = 'block';
+        setTimeout(() => el.style.display = 'none', 4500);
+    }
+
+    async function api(path, options = {}) {
+        const headers = {'Content-Type':'application/json', ...(options.headers || {})};
+        const token = getToken();
+        if (token) headers.Authorization = 'Bearer ' + token;
+
+        const response = await fetch(API + path, {...options, headers});
+        const text = await response.text();
+        let data;
+        try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('kitapUser');
+                location.href = '/login';
+            }
+            let message = (data && typeof data === 'object' && (data.error || data.message))
+                || (typeof data === 'string' && data && data.length < 200 ? data : '')
+                || `Request failed (${response.status})`;
+            if (response.status === 403) message = 'Access denied: only ADMIN can do this.';
+            throw new Error(message);
+        }
+        return data;
+    }
+
+    async function loadOrders() {
+        try {
+            const orders = await api('/api/orders');
+            $('#orderRows').innerHTML = orders.length ? orders.map(o => `
+      <tr>
+        <td>#${esc(o.id)}</td>
+        <td>${esc(fmtDate(o.createdAt))}</td>
+        <td>${esc(o.customerName)}</td>
+        <td>${esc(o.userEmail || '—')}</td>
+        <td>${esc(o.address)}</td>
+        <td>${money(o.totalPrice)}</td>
+        <td>
+          <select id="status-${Number(o.id)}">
+            ${STATUSES.map(s => `<option value="${s}" ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+        </td>
+        <td><button class="blue" onclick="saveStatus(${Number(o.id)})">Save</button></td>
+      </tr>`).join('') : '<tr><td colspan="8">No orders yet.</td></tr>';
+        } catch (e) {
+            notice(e.message);
+            $('#orderRows').innerHTML = '<tr><td colspan="8">Could not load orders.</td></tr>';
+        }
+    }
+
+    async function saveStatus(id) {
+        const status = $('#status-' + id).value;
+        try {
+            await api(`/api/orders/${id}/status?status=${encodeURIComponent(status)}`, {method:'PUT'});
+            notice(`Order #${id} is now ${status}.`, true);
+        } catch (e) { notice(e.message); }
+    }
+
+    loadOrders();
+</script>
+</body>
+</html>

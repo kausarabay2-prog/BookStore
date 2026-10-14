@@ -1,6 +1,7 @@
 package Book.bitlab.BookStore.controllers;
 
 import Book.bitlab.BookStore.dto.CartItemDto;
+import Book.bitlab.BookStore.dto.CartLineDto;
 import Book.bitlab.BookStore.service.CartService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +18,7 @@ public class CartController {
 
     private final CartService cartService;
 
-    // Cart entity ішінде User және password hash сыртқа шықпайды, тек id
+    // Cart entity сыртқа шықпайды, тек id
     @PostMapping
     public ResponseEntity<Map<String, Long>> createCart(Authentication authentication) {
         Long id = cartService.createCart(authentication.getName()).getId();
@@ -36,11 +37,33 @@ public class CartController {
     }
 
     @GetMapping("/{cartId}")
-    public ResponseEntity<List<CartItemDto>> getCart(
+    public ResponseEntity<List<CartLineDto>> getCart(
             @PathVariable Long cartId,
             Authentication authentication
     ) {
         return ResponseEntity.ok(cartService.getCart(cartId, authentication.getName()));
+    }
+
+    // Санын өзгерту: quantity=0 болса, өшіреді
+    @PutMapping("/{cartId}/items/{bookId}")
+    public ResponseEntity<List<CartLineDto>> updateQuantity(
+            @PathVariable Long cartId,
+            @PathVariable Long bookId,
+            @RequestParam Integer quantity,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(
+                cartService.updateQuantity(cartId, bookId, quantity, authentication.getName()));
+    }
+
+    @DeleteMapping("/{cartId}/items/{bookId}")
+    public ResponseEntity<List<CartLineDto>> removeItem(
+            @PathVariable Long cartId,
+            @PathVariable Long bookId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(
+                cartService.removeItem(cartId, bookId, authentication.getName()));
     }
 
     @DeleteMapping("/{cartId}")

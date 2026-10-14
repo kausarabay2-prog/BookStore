@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Users Admin | BookStore</title>
+    <style>
+        *{box-sizing:border-box}body{margin:0;background:#f5f6fa;color:#252a34;font-family:Arial,sans-serif}
+        header{height:65px;background:#292f3b;color:white}
+        .wrap{width:min(1120px,94%);margin:auto}.head{height:100%;display:flex;align-items:center;justify-content:space-between}
+        header a{color:white;text-decoration:none;font-weight:bold}.brand{font-size:20px}
+        main{padding:28px 0}
+        .panel{padding:20px;background:white;border:1px solid #e6e8ed;border-radius:9px}
+        h1{margin:0 0 6px;font-size:28px}.muted{color:#747c88;font-size:13px}
+        button{border:0;border-radius:6px;padding:8px 11px;cursor:pointer;font-weight:bold;margin-right:6px}
+        button:disabled{opacity:.5;cursor:not-allowed}
+        .blue{background:#4285dc;color:white}.red{background:#e4545d;color:white}.gray{background:#e9ebf0;color:#3a404c}
+        table{width:100%;border-collapse:collapse;margin-top:15px}
+        th,td{padding:12px 9px;border-bottom:1px solid #eceef2;text-align:left;font-size:14px;vertical-align:middle}
+        th{color:#747c88;font-size:12px}
+        .role{display:inline-block;padding:3px 8px;margin:0 4px 4px 0;border-radius:6px;background:#eef0f8;color:#33407a;font-size:12px;font-weight:bold}
+        .role.admin{background:#fdebea;color:#b8312f}.role.seller{background:#e7f5ed;color:#26714f}
+        .notice{display:none;margin:12px 0;padding:11px;border-radius:6px;background:#fff0e7;color:#93482f}
+        .notice.ok{background:#e7f5ed;color:#26714f}
+        .table-wrap{overflow-x:auto}
+    </style>
+</head>
+<body>
+<header>
+    <div class="wrap head">
+        <a class="brand" href="/">📚 BookStore Admin</a>
+        <div>
+            <span id="adminName" style="margin-right:18px"></span>
+            <a href="/admin" style="margin-right:18px">Books</a>
+            <a href="/admin/orders" style="margin-right:18px">Orders</a>
+            <a href="/">Store</a>
+        </div>
+    </div>
+</header>
+
+<main class="wrap">
+    <div id="notice" class="notice"></div>
+    <section class="panel">
+        <h1>Users</h1>
+        <p class="muted">Only staff members should be sellers: give the SELLER role to an employee so they can open their own shop and manage their own books. ADMIN manages everything. Users cannot make themselves sellers.</p>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr><th>ID</th><th>Username</th><th>Email</th><th>Roles</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="userRows"></tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+<script>
+    const API = '';
+    const $ = s => document.querySelector(s);
+
+    const getToken = () => localStorage.getItem('token');
+    function getUser() {
+        try { return JSON.parse(localStorage.getItem('kitapUser') || 'null'); }
+        catch { return null; }
+    }
+    const isAdmin = () => { const u = getUser(); return !!u && Array.isArray(u.roles) && u.roles.includes('ROLE_ADMIN'); };
+
+    function esc(v) {
+        return String(v ?? '').replace(/[&<>"']/g, c =>
+            ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
+        );
+    }
+    function notice(text, ok = false) {
+        const el = $('#notice');
+        el.textContent = text;
+        el.className = ok ? 'notice ok' : 'notice';
+        el.style.display = 'block';
+        setTimeout(() => el.style.display = 'none', 4500);
+    }
+
+    async function api(path, options = {}) {
+        const headers = {'Content-Type':'application/json', ...(options.headers || {})};
+        const token = getToken();
+        if (token) headers.Authorization = 'Bearer ' + token;
+
+        const response = await fetch(API + path, {...options, headers});
+        const text = await response.text();
+        let data;
+        try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('kitapUser');
+                location.href = '/login';
+            }
+            let message = (data && typeof data === 'object' && (data.error || data.message))
+                || `Request failed (${response.status})`;
+            if (response.status === 403 && message === 'Forbidden') {
+                message = 'Access denied: only ADMIN can do this.';
+            }
+            throw new Error(message);
+        }
+        return data;
+    }
+
+    const roleClass = r => r === 'ROLE_ADMIN' ? 'admin' : r === 'ROLE_SELLER' ? 'seller' : '';
+
+    async function loadUsers() {
+        try {
+            const users = await api('/api/admin/users');
+            const me = (getUser()?.email || '').toLowerCase();
+
+            $('#userRows').innerHTML = users.map(u => {
+                const isSeller = u.roles.includes('ROLE_SELLER');
+                const isAdm = u.roles.includes('ROLE_ADMIN');
+                const self = (u.email || '').toLowerCase() === me;
+                return `
+        <tr>
+          <td>${esc(u.id)}</td>
+          <td>${esc(u.username)}${self ? ' <span class="muted">(you)</span>' : ''}</td>
+          <td>${esc(u.email)}</td>
+          <td>${u.roles.map(r => `<span class="role ${roleClass(r)}">${esc(r.replace('ROLE_', ''))}</span>`).join('')}</td>
+          <td>
+            ${isSeller
+                    ? `<button class="gray" onclick="setRole(${Number(u.id)}, 'SELLER', false)">Remove seller</button>`
+                    : `<button class="blue" onclick="setRole(${Number(u.id)}, 'SELLER', true)">Make seller</button>`}
+            ${isAdm
+                    ? `<button class="red" ${self ? 'disabled title="You cannot remove your own admin role"' : ''} onclick="setRole(${Number(u.id)}, 'ADMIN', false)">Remove admin</button>`
+                    : `<button class="gray" onclick="setRole(${Number(u.id)}, 'ADMIN', true)">Make admin</button>`}
+          </td>
+        </tr>`;
+            }).join('') || '<tr><td colspan="5">No users.</td></tr>';
+        } catch (e) {
+            notice(e.message);
+            $('#userRows').innerHTML = '<tr><td colspan="5">Could not load users.</td></tr>';
+        }
+    }
+
+    async function setRole(id, role, grant) {
+        if (role === 'ADMIN' && grant && !confirm('Give this user full ADMIN access?')) return;
+        try {
+            await api(`/api/admin/users/${id}/roles/${role}`, {method: grant ? 'POST' : 'DELETE'});
+            await loadUsers();
+            notice(`${grant ? 'Granted' : 'Removed'} ${role}.`, true);
+        } catch (e) { notice(e.message); }
+    }
+
+    (async function init() {
+        if (!getToken()) { location.href = '/login'; return; }
+        try {
+            const me = await api('/api/me');
+            localStorage.setItem('kitapUser', JSON.stringify(me));
+        } catch { return; }
+
+        if (!isAdmin()) {
+            notice('Only ADMIN can open this page.');
+            setTimeout(() => location.href = '/', 2000);
+            return;
+        }
+        const u = getUser();
+        $('#adminName').textContent = '👤 ' + (u?.username || u?.email || '');
+        loadUsers();
+    })();
+</script>
+</body>
+</html>

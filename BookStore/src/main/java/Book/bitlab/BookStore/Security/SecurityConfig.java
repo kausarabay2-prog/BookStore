@@ -54,12 +54,11 @@ public class SecurityConfig {
 
                         // HTML беттер және статикалық файлдар.
                         // Беттің өзі ашық, ал деректер API арқылы қорғалған.
-                        // Браузер бетті ашқанда Authorization header жібермейді,
-                        // сондықтан /admin, /cart, /details ашық болуы керек.
                         .requestMatchers(
                                 "/", "/books",
                                 "/index.html",
-                                "/login", "/register", "/cart", "/admin",
+                                "/login", "/register", "/cart", "/orders", "/shop", "/open-shop",
+                                "/admin", "/admin/orders", "/admin/users",
                                 "/details", "/details/**",
                                 "/*.html",
                                 "/favicon.ico", "/error",
@@ -69,21 +68,38 @@ public class SecurityConfig {
                         // Login / Register
                         .requestMatchers("/api/auth/**").permitAll()
 
-                        // Кітаптар: оқу — барлығына, өзгерту — ADMIN
-                        .requestMatchers(HttpMethod.GET, "/api/books", "/api/books/**").permitAll()
-                        .requestMatchers("/api/books/**").hasRole("ADMIN")
+                        // Ағымдағы пайдаланушы
+                        .requestMatchers("/api/me").authenticated()
 
-                        // Категориялар: оқу — барлығына, өзгерту — ADMIN
+                        // Пайдаланушыларға рөл беру: тек ADMIN
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
+                        // Кітаптар: оқу: барлығына (ҚАТАҢ ретпен: /mine алдымен),
+                        // қосу/өзгерту/өшіру/restock: ADMIN немесе SELLER
+                        // (SELLER тек өз кітабын, бұл BookService-те тексеріледі)
+                        .requestMatchers(HttpMethod.GET, "/api/books/mine").hasAnyRole("ADMIN", "SELLER")
+                        .requestMatchers(HttpMethod.GET, "/api/books", "/api/books/**").permitAll()
+                        .requestMatchers("/api/books/**").hasAnyRole("ADMIN", "SELLER")
+
+                        // Дүкендер: көру: барлығына, ашу/өзгерту: тек қызметкер (SELLER) немесе ADMIN
+                        // (/mine алдымен тұруы керек)
+                        .requestMatchers(HttpMethod.GET, "/api/shops/mine").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/shops", "/api/shops/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/shops").hasAnyRole("ADMIN", "SELLER")
+                        .requestMatchers(HttpMethod.PUT, "/api/shops/mine").hasAnyRole("ADMIN", "SELLER")
+
+                        // Категориялар: оқу: барлығына, өзгерту: ADMIN
                         .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/**").permitAll()
                         .requestMatchers("/api/categories/**").hasRole("ADMIN")
 
-                        // Себет — тек кірген пайдаланушы
+                        // Себет: тек кірген пайдаланушы
                         .requestMatchers("/api/cart", "/api/cart/**").authenticated()
 
-                        // Тапсырыс жасау — кірген пайдаланушы
+                        // Тапсырыс жасау және өз тапсырыстарын көру: кірген пайдаланушы
                         .requestMatchers(HttpMethod.POST, "/api/orders").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/orders/my").authenticated()
 
-                        // Қалған тапсырыс операциялары — ADMIN
+                        // Қалған тапсырыс операциялары: ADMIN
                         .requestMatchers("/api/orders", "/api/orders/**").hasRole("ADMIN")
 
                         .anyRequest().authenticated()
