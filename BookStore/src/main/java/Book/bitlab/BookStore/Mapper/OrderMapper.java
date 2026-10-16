@@ -9,8 +9,9 @@ import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface OrderMapper {
-
+    @Mapping(source = "user.email", target = "userEmail")
     OrderDTO toDto(Order order);
+
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "items", ignore = true)

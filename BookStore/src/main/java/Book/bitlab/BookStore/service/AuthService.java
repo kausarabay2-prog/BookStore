@@ -22,21 +22,19 @@ public class AuthService {
         return userService.register(dto);
     }
 
-    // Токенмен бірге пайдаланушы аты мен рөлдерін де қайтарамыз
     public AuthResponse login(String email, String password) {
 
         User user = userService.login(email, password);
-
         List<String> roles = user.getRoles()
                 .stream()
-                .map(role -> role.getName())
+                .map(role -> role.getName())//,берет их называние
                 .toList();
 
         UserDetails userDetails =
                 org.springframework.security.core.userdetails.User
                         .withUsername(user.getEmail())
                         .password(user.getPassword())
-                        .authorities(roles.toArray(String[]::new))
+                        .authorities(roles.toArray(String[]::new))//передаются роли пользователя.
                         .build();
 
         String token = jwtService.generateToken(userDetails);

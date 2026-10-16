@@ -33,7 +33,7 @@ public class UserAdminService {
                 user.getRoles().stream().map(Role::getName).sorted().toList()
         );
     }
-
+//    Метод normalize() — проверка роли
     private String normalize(String role) {
         if (role == null || role.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Role is required");

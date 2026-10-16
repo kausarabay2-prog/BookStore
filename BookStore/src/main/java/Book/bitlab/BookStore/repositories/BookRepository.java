@@ -19,6 +19,7 @@ public interface BookRepository extends JpaRepository<Book, Long> {
 
     List<Book> findByCategoryId(Long categoryId);
 
+
     List<Book> findByPriceBetween(Double minPrice, Double maxPrice);
 
     // Сатушының өз кітаптары

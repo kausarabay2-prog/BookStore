@@ -21,7 +21,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional
 public class BookService {
-
+//Ограничения количества книг
     private static final int MAX_STOCK = 1_000_000;
     private static final int MAX_RESTOCK = 100_000;
 
@@ -30,8 +30,8 @@ public class BookService {
     private final UserRepository userRepository;
     private final ShopRepository shopRepository;
     private final BookMapper bookMapper;
-
     private ResponseStatusException bad(String msg) {
+
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, msg);
     }
 
@@ -41,7 +41,6 @@ public class BookService {
                         HttpStatus.NOT_FOUND, "Book not found: " + id));
     }
 
-    // ADMIN: кез келген кітап. SELLER: тек өз кітабы.
     private void assertCanManage(Book book, String email, boolean admin) {
         if (admin) return;
 
@@ -59,20 +58,22 @@ public class BookService {
         }
         return value;
     }
-
+//Получение списка книг
     @Transactional(readOnly = true)
     public List<BookDTO> getAll() {
-        return bookRepository.findAll().stream().map(bookMapper::toDto).toList();
+        return bookRepository.
+                findAll()
+                .stream()
+                .map(bookMapper::toDto)
+                .toList();
     }
 
-    // Сатушының өз кітаптары
     @Transactional(readOnly = true)
     public List<BookDTO> getMine(String email) {
         return bookRepository.findByOwner_EmailOrderByIdDesc(email)
                 .stream().map(bookMapper::toDto).toList();
     }
 
-    // Бір дүкеннің кітаптары
     @Transactional(readOnly = true)
     public List<BookDTO> getByShop(Long shopId) {
         return bookRepository.findByShop_IdOrderByIdDesc(shopId)
@@ -81,9 +82,9 @@ public class BookService {
 
     @Transactional(readOnly = true)
     public BookDTO getById(Long id) {
+
         return bookMapper.toDto(find(id));
     }
-
     private boolean hasCategory(BookDTO dto) {
         return dto.getCategoryId() != null
                 || (dto.getCategoryName() != null && !dto.getCategoryName().isBlank());
@@ -104,23 +105,23 @@ public class BookService {
 
         throw bad("Category is required. Send categoryId or categoryName");
     }
-
     private void validate(BookDTO dto) {
         if (dto == null) throw bad("Book data is required");
-        if (dto.getTitle() == null || dto.getTitle().isBlank()) throw bad("Title must not be empty");
+        if (dto.getTitle() == null ||
+                dto.getTitle().isBlank())
+            throw bad("Title must not be empty");
         if (dto.getAuthor() == null || dto.getAuthor().isBlank()) throw bad("Author must not be empty");
         if (dto.getPrice() == null || !Double.isFinite(dto.getPrice()) || dto.getPrice() < 0) {
             throw bad("Price must be zero or greater");
         }
     }
-
     public BookDTO create(BookDTO dto, String email) {
         validate(dto);
-
+//находит пользователя, который будет её владельцем.
         User owner = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.UNAUTHORIZED, "User not found"));
-
+        //Далее создаётся объект:
         Book book = Book.builder()
                 .title(dto.getTitle().trim())
                 .author(dto.getAuthor().trim())
@@ -142,22 +143,18 @@ public class BookService {
         assertCanManage(book, email, admin);
         validate(dto);
 
-        // Категория келмесе, ескісі сақталады
         if (hasCategory(dto)) {
             book.setCategory(getCategory(dto));
         }
-
         book.setTitle(dto.getTitle().trim());
         book.setAuthor(dto.getAuthor().trim());
         book.setPrice(dto.getPrice());
         book.setDescription(dto.getDescription());
 
-        // Сурет жіберілмесе, ескі сурет өшіп кетпейді
         if (dto.getImageUrl() != null) {
             book.setImageURL(dto.getImageUrl());
         }
 
-        // Саны жіберілмесе, бұрынғысы сақталады
         if (dto.getStock() != null) {
             book.setStock(validStock(dto.getStock()));
         }
@@ -165,7 +162,7 @@ public class BookService {
         return bookMapper.toDto(bookRepository.save(book));
     }
 
-    // Қоймаға дана қосу (біткен кітапты толтыру)
+    // Пополнение склада
     public BookDTO restock(Long id, Integer amount, String email, boolean admin) {
         if (amount == null || amount < 1 || amount > MAX_RESTOCK) {
             throw bad("Amount must be between 1 and " + MAX_RESTOCK);
@@ -186,7 +183,6 @@ public class BookService {
         bookRepository.delete(book);
     }
 
-    // Атауы НЕМЕСЕ авторы бойынша іздеу
     @Transactional(readOnly = true)
     public List<BookDTO> search(String keyword) {
         String k = keyword == null ? "" : keyword.trim();

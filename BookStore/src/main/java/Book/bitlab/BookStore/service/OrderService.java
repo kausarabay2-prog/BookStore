@@ -41,45 +41,45 @@ public class OrderService {
     public OrderDTO create(OrderDTO dto, String email) {
 
         if (dto == null || dto.getCartId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart ID is required");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Cart ID is required");
         }
         if (dto.getCustomerName() == null || dto.getCustomerName().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Customer name is required");
-        }
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Customer name is required");
+        }//Проверяет, что имя покупателя заполнено
         if (dto.getAddress() == null || dto.getAddress().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Address is required");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Address is required");
         }
-
-        // Тек өз себетіне рұқсат (админ мен сатушы да өз себетінен кез келген кітап,
-        // оның ішінде өз кітабын да сатып ала алады)
         Cart cart = cartRepository.findByIdAndUser_Email(dto.getCartId(), email)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.FORBIDDEN, "You do not have access to this cart"));
-
         if (cart.getItems() == null || cart.getItems().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart is empty");
         }
 
-        // Әр кітап бойынша жалпы санды жинаймыз
+
         Map<Long, Integer> wanted = new LinkedHashMap<>();
         for (CartItem cartItem : cart.getItems()) {
-            if (cartItem == null || cartItem.getBook() == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart contains an invalid item");
+            if (cartItem == null || cartItem.getBook() == null) { //exsistence
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Cart contains an invalid item");
             }
             Integer quantity = cartItem.getQuantity();
             if (quantity == null || quantity <= 0) {
                 throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "Invalid quantity for book: " + cartItem.getBook().getId());
+                        HttpStatus.BAD_REQUEST,
+                        "Invalid quantity for book: " + cartItem.getBook().getId());
             }
+            //save id to wanted
             wanted.merge(cartItem.getBook().getId(), quantity, Integer::sum);
         }
 
-        // Қойма жолдарын қамаймыз: екі адам бір мезгілде соңғы данаға тапсырыс бере алмайды
         Map<Long, Book> locked = new HashMap<>();
         for (Book b : bookRepository.findAllByIdForUpdate(wanted.keySet())) {
             locked.put(b.getId(), b);
         }
-
         Order order = Order.builder()
                 .customerName(dto.getCustomerName().trim())
                 .address(dto.getAddress().trim())
@@ -90,9 +90,7 @@ public class OrderService {
                 .items(new ArrayList<>())
                 .build();
 
-        // Жалпы соманы тек серверде есептейміз, клиенттің бағасы ескерілмейді
         BigDecimal total = BigDecimal.ZERO;
-
         for (Map.Entry<Long, Integer> entry : wanted.entrySet()) {
             Book book = locked.get(entry.getKey());
             int quantity = entry.getValue();
@@ -101,8 +99,8 @@ public class OrderService {
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT, "Oops! A book in your basket no longer exists. Please remove it.");
             }
-
             int stock = book.getStock() == null ? 0 : book.getStock();
+
             if (stock <= 0) {
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT,
@@ -114,16 +112,13 @@ public class OrderService {
                         "Oops! Only " + stock + " cop" + (stock == 1 ? "y" : "ies")
                                 + " of \"" + book.getTitle() + "\" left in stock.");
             }
-
             Double price = book.getPrice();
             if (price == null || !Double.isFinite(price) || price < 0) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST, "Invalid price for book: " + book.getId());
             }
-
             total = total.add(BigDecimal.valueOf(price).multiply(BigDecimal.valueOf(quantity)));
 
-            // Қоймадан азайту
             book.setStock(stock - quantity);
 
             order.getItems().add(
@@ -167,21 +162,23 @@ public class OrderService {
         return orderMapper.toDto(order);
     }
 
-    @Transactional
+    @Transactional //changes of stat
     public OrderDTO updateStatus(Long id, String status) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Order not found: " + id));
-
+//check
         if (status == null || !STATUSES.contains(status.trim().toUpperCase())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid order status");
         }
 
         String newStatus = status.trim().toUpperCase();
 
-        // Тапсырыс бас тартылса, кітаптар қоймаға қайтарылады (бір рет қана)
-        if ("CANCELLED".equals(newStatus) && !"CANCELLED".equals(order.getStatus())
-                && order.getItems() != null) {
+        // отмена
+        if ("CANCELLED".equals(order.getStatus()) && !"CANCELLED".equals(newStatus)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "A cancelled order cannot be reopened");
+        }
             for (OrderItem item : order.getItems()) {
                 Book book = item.getBook();
                 Integer qty = item.getQuanity();
@@ -189,8 +186,9 @@ public class OrderService {
                     int current = book.getStock() == null ? 0 : book.getStock();
                     book.setStock(current + qty);
                 }
+
             }
-        }
+
 
         order.setStatus(newStatus);
         return orderMapper.toDto(orderRepository.save(order));

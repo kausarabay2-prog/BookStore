@@ -31,6 +31,7 @@ public class ShopController {
 
     @GetMapping("/{id}")
     public ResponseEntity<ShopDTO> getById(@PathVariable Long id) {
+
         return ResponseEntity.ok(shopService.getById(id));
     }
 

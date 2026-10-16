@@ -14,27 +14,29 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
-@EnableWebSecurity
+@EnableWebSecurity//включает настройку Spring Security для веб-приложения.
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    public PasswordEncoder passwordEncoder() {//интерфейс для хеширования и проверки паролей.
+        return new BCryptPasswordEncoder(); //реализация, использующая алгоритм
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {//определяет правила обработки HTTP-запросов и доступ к endpoint'ам.
 
         http
                 .csrf(csrf -> csrf.disable())
+                //Приложение не использует HTTP-сессии для хранения состояния авторизации. Каждый защищённый запрос должен содержать JWT-токен.
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable())
 
                 // API үшін таза JSON жауап (401 / 403)
+                //Здесь приложение возвращает понятные JSON-ответы вместо стандартной HTML-страницы ошибки.
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((req, res, e) -> {
                             res.setStatus(401);
@@ -52,8 +54,8 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
-                        // HTML беттер және статикалық файлдар.
-                        // Беттің өзі ашық, ал деректер API арқылы қорғалған.
+
+                        //Здесь правила зависят от HTTP-метода и адреса:
                         .requestMatchers(
                                 "/", "/books",
                                 "/index.html",

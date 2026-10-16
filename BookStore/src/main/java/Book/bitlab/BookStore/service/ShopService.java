@@ -37,7 +37,7 @@ public class ShopService {
     private ResponseStatusException bad(String msg) {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, msg);
     }
-
+//    Метод проверяет и очищает название магазина.
     private String cleanName(ShopRequest req) {
         if (req == null || req.name() == null || req.name().isBlank()) {
             throw bad("Shop name is required");
@@ -48,7 +48,7 @@ public class ShopService {
         }
         return name;
     }
-
+//проверка описания
     private String cleanDescription(ShopRequest req) {
         if (req.description() == null) return null;
         String d = req.description().trim();
@@ -68,7 +68,7 @@ public class ShopService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.UNAUTHORIZED, "User not found"));
-
+//Проверка роли
         boolean staff = user.getRoles().stream()
                 .anyMatch(r -> SELLER.equals(r.getName()) || ADMIN.equals(r.getName()));
         if (!staff) {
@@ -79,6 +79,7 @@ public class ShopService {
         if (shopRepository.findByOwner_Email(email).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "You already have a shop");
         }
+
         if (shopRepository.existsByNameIgnoreCase(name)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "A shop with this name already exists");
         }
@@ -108,7 +109,7 @@ public class ShopService {
         shop.setDescription(cleanDescription(req));
         return toDto(shopRepository.save(shop));
     }
-
+//получение своего магазина
     @Transactional(readOnly = true)
     public ShopDTO getMine(String email) {
         return shopRepository.findByOwner_Email(email)

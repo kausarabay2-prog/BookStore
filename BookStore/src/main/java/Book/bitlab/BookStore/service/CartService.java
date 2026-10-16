@@ -29,16 +29,18 @@ public class CartService {
     private final UserRepository userRepository;
     private final CartMapper cartMapper;
 
+    //Проверка владельца корзины
     private Cart getOwnedCart(Long cartId, String email) {
         return cartRepository.findByIdAndUser_Email(cartId, email)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.FORBIDDEN, "You do not have access to this cart"));
     }
-
+//Проверка остатка книги
     private int stockOf(Book book) {
+
         return book == null || book.getStock() == null ? 0 : book.getStock();
     }
-
+//Клиент получает ID книги, название, цену, количество в корзине и остаток на складе.
     private CartLineDto toLine(CartItem item) {
         Book book = item.getBook();
         return new CartLineDto(
@@ -49,8 +51,8 @@ public class CartService {
                 stockOf(book)
         );
     }
-
     private List<CartLineDto> toLines(Cart cart) {
+
         return cart.getItems().stream().map(this::toLine).toList();
     }
 
@@ -74,7 +76,8 @@ public class CartService {
                 "Oops! Only " + stock + " cop" + (stock == 1 ? "y" : "ies")
                         + " of \"" + book.getTitle() + "\" left in stock.");
     }
-
+//Сначала сервис находит пользователя по email,
+// затем создаёт для него корзину и сохраняет её в базе данных.
     @Transactional
     public Cart createCart(String email) {
         User user = userRepository.findByEmail(email)
@@ -105,22 +108,24 @@ public class CartService {
 
         // Сол кітап бұрын қосылған болса, санын көбейтеміз
         CartItem target = null;
-        for (CartItem existing : cart.getItems()) {
-            if (existing.getBook() != null && existing.getBook().getId().equals(bookId)) {
+        for (CartItem existing : cart.getItems()) { //проверяет, что книга существует.
+            if (existing.getBook() != null && existing.getBook().getId().equals(bookId)) {// сравнив
                 target = existing;
                 break;
             }
         }
-
+//. Вычисление нового количества
         int newQty = (target == null ? 0 : target.getQuantity()) + quantity;
+        //Проверка максимального количества
         if (newQty > MAX_QUANTITY) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST, "Maximum " + MAX_QUANTITY + " copies per book");
         }
+        //Проверка количества на складе
         if (newQty > stock) {
             throw notEnough(book, stock);
         }
-
+//Добавление новой книги или изменение количества
         if (target == null) {
             target = CartItem.builder()
                     .cart(cart)
@@ -133,7 +138,7 @@ public class CartService {
         }
 
         Cart saved = cartRepository.saveAndFlush(cart);
-
+//        Поиск добавленной книги и преобразование в DTO
         CartItem result = saved.getItems().stream()
                 .filter(i -> i.getBook() != null && i.getBook().getId().equals(bookId))
                 .findFirst()
@@ -144,12 +149,14 @@ public class CartService {
 
     @Transactional(readOnly = true)
     public List<CartLineDto> getCart(Long cartId, String email) {
+
         return toLines(getOwnedCart(cartId, email));
     }
 
     // Санын өзгерту (0 болса, кітап себеттен өшеді)
     @Transactional
-    public List<CartLineDto> updateQuantity(Long cartId, Long bookId, Integer quantity, String email) {
+    public List<CartLineDto> updateQuantity(
+            Long cartId, Long bookId, Integer quantity, String email) {
 
         if (quantity == null || quantity < 0 || quantity > MAX_QUANTITY) {
             throw new ResponseStatusException(
@@ -173,7 +180,7 @@ public class CartService {
         cartRepository.saveAndFlush(cart);
         return toLines(cart);
     }
-
+//Этот метод удаляет определённую книгу из корзины покупателя.
     @Transactional
     public List<CartLineDto> removeItem(Long cartId, Long bookId, String email) {
         Cart cart = getOwnedCart(cartId, email);

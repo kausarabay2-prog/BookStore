@@ -19,6 +19,7 @@ public class UserAdminController {
 
     @GetMapping
     public ResponseEntity<List<AdminUserDto>> getAll() {
+
         return ResponseEntity.ok(userAdminService.getAll());
     }
 
